@@ -296,10 +296,10 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
 .shape-2 { width: 60px; height: 60px; bottom: 5%; right: 80%; animation-delay: 1s; }
 @keyframes float { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-20px) rotate(180deg); } }
 
-.chart-wrapper { overflow-x: auto; padding-bottom: 10px; }
+.chart-wrapper { overflow:hidden; padding-bottom: 10px; }
 #eventsChart{
     height:250px;
-    min-width:1100px;
+    width:100% !important;
     display:block;
     background:#fff;
 }
@@ -314,8 +314,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
 
 .events-chart-scroll{
     width:100%;
-    overflow-x:auto;
-    overflow-y:hidden;
+    overflow:hidden;
     padding-bottom:8px;
     background:#fff;
     border-radius:16px;
@@ -327,13 +326,13 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
 
 .municipality-chart-scroll{
     width:100%;
-    overflow-x:auto;
-    overflow-y:hidden;
+    overflow:hidden;
     padding-bottom:6px;
 }
 
 #municipalityChart{
     min-height:250px;
+    width:100% !important;
     display:block;
     background:#fff;
 }
@@ -602,7 +601,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
     }
 
     #eventsChart{
-        min-width:760px;
+        min-width:0;
     }
 }
 
@@ -665,7 +664,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
     }
 
     #eventsChart{
-        min-width:620px;
+        min-width:0;
     }
 }
 </style>
@@ -761,7 +760,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
         </div>
 
         <div class="municipality-chart-scroll">
-            <canvas id="municipalityChart" style="min-width:<?php echo (int) $municipalityChartMinWidth; ?>px;"></canvas>
+            <canvas id="municipalityChart"></canvas>
         </div>
     </div>
 
@@ -937,11 +936,11 @@ const eventsChart = new Chart(ctx, {
             backgroundColor: '#001a47',
             borderColor: '#001a47',
             borderWidth: 1,
-            barThickness: 40
+            maxBarThickness: 40
         }]
     },
     options: {
-    responsive: false,
+    responsive: true,
     maintainAspectRatio: false,
         plugins: {
             legend: { display: false },
@@ -1098,7 +1097,7 @@ new Chart(document.getElementById('municipalityChart'), {
         ]
     },
     options:{
-        responsive:false,
+        responsive:true,
         maintainAspectRatio:false,
         plugins:{
             legend:{

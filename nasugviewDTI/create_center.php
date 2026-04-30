@@ -77,6 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Add Negosyo Center</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -127,6 +128,33 @@ font-weight:600;
 
 .btn-submit:hover{
 background:#00308a;
+}
+
+@media (max-width:768px){
+    body{
+        padding:1rem;
+    }
+
+    .card{
+        padding:1.25rem;
+        border-radius:16px;
+    }
+}
+
+@media (max-width:576px){
+    body{
+        padding:.75rem;
+    }
+
+    .card h3{
+        font-size:1.35rem;
+    }
+
+    .mt-3 .btn{
+        width:100%;
+        margin-left:0 !important;
+        margin-top:.5rem;
+    }
 }
 
 </style>

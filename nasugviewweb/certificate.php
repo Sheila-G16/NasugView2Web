@@ -108,6 +108,7 @@ body{
     font-family:'Poppins',sans-serif;
     background:linear-gradient(135deg, var(--navy) 0%, var(--navy-deep) 100%);
     color:var(--ink);
+    overflow-x:hidden;
 }
 
 .main-content{
@@ -115,6 +116,7 @@ body{
     min-height:100vh;
     padding:12px;
     background:var(--secondary);
+    overflow-x:hidden;
 }
 
 body.left-panel-hidden .main-content{
@@ -451,7 +453,7 @@ body.left-panel-hidden .main-content{
         repeating-linear-gradient(0deg, rgba(0,26,71,.04) 0, rgba(0,26,71,.04) 1px, transparent 1px, transparent 34px),
         repeating-linear-gradient(90deg, rgba(0,26,71,.04) 0, rgba(0,26,71,.04) 1px, transparent 1px, transparent 34px);
     border:1px solid rgba(0,26,71,.08);
-    overflow:auto;
+    overflow:hidden;
     display:flex;
     align-items:flex-start;
     justify-content:flex-start;
@@ -837,6 +839,10 @@ body.left-panel-hidden .main-content{
     flex-shrink:0;
 }
 
+.panel-toggle i{
+    pointer-events:none;
+}
+
 .panel-toggle:hover{
     transform:translateY(-1px);
     box-shadow:0 12px 24px rgba(0,26,71,.12);
@@ -850,6 +856,22 @@ body.left-panel-hidden .main-content{
     display:none;
     box-shadow:0 12px 24px rgba(0,26,71,.12);
     border-radius:12px;
+}
+
+.panel-toggle-float::after{
+    content:"Tools";
+    position:absolute;
+    left:calc(100% + 8px);
+    top:50%;
+    transform:translateY(-50%);
+    padding:7px 10px;
+    border-radius:999px;
+    background:rgba(255,255,255,.96);
+    color:var(--navy);
+    font-size:11px;
+    font-weight:700;
+    box-shadow:0 10px 22px rgba(0,26,71,.12);
+    pointer-events:none;
 }
 
 .page-shell.left-panel-hidden ~ .panel-toggle-float,
@@ -944,11 +966,11 @@ body.exporting #canvas::before{
 
 @media (max-width:1500px){
     .page-shell{
-        grid-template-columns:200px minmax(0, 1fr);
+        grid-template-columns:180px minmax(0, 1fr);
     }
 
     .page-shell.inspector-hidden{
-        grid-template-columns:200px minmax(0, 1fr);
+        grid-template-columns:180px minmax(0, 1fr);
     }
 
     .page-shell.left-panel-hidden{
@@ -967,15 +989,16 @@ body.exporting #canvas::before{
 @media (max-width:1080px){
     .main-content{
         margin-left:0;
-        padding:12px;
+        padding:76px 10px 10px;
     }
 
     body.left-panel-hidden .main-content{
-        padding-top:64px;
+        padding-top:76px;
     }
 
     .page-shell{
-        grid-template-columns:1fr;
+        grid-template-columns:minmax(0, 1fr);
+        gap:8px;
     }
 
     .page-shell.inspector-hidden{
@@ -991,17 +1014,181 @@ body.exporting #canvas::before{
     }
 
     .workspace-header{
-        flex-direction:column;
+        flex-direction:row;
+        align-items:center;
     }
 
     .board-stage{
-        padding:16px;
+        padding:8px;
+        min-height:0;
     }
 
     .panel-toggle-float{
         top:18px;
-        left:18px;
+        left:70px;
         border-radius:12px;
+    }
+}
+
+@media (max-width:768px){
+    .page-shell{
+        grid-template-columns:minmax(0, 1fr);
+    }
+
+    .panel{
+        border-radius:14px;
+        box-shadow:0 12px 30px rgba(0,26,71,.10);
+    }
+
+    .panel-head{
+        padding:10px 10px 6px;
+    }
+
+    .panel-body{
+        padding:0 10px 10px;
+    }
+
+    .left-tools-panel .subtitle,
+    .workspace-title p,
+    .shortcut-note,
+    .footer-note,
+    .tool-btn span,
+    .template-card span{
+        display:none;
+    }
+
+    .left-tools-panel .panel-head-main h1{
+        font-size:15px;
+        line-height:1.15;
+        margin-top:6px;
+    }
+
+    .tool-grid{
+        grid-template-columns:repeat(4, minmax(0, 1fr));
+        gap:6px;
+    }
+
+    .tool-btn{
+        min-height:42px;
+        padding:8px 6px;
+        align-items:center;
+        justify-content:center;
+        text-align:center;
+        border-radius:10px;
+    }
+
+    .tool-btn strong{
+        font-size:10px;
+        line-height:1.15;
+    }
+
+    .workspace{
+        gap:8px;
+    }
+
+    .workspace-header{
+        padding:10px 10px 0;
+        gap:8px;
+    }
+
+    .workspace-title h2{
+        font-size:15px;
+        margin-top:4px;
+    }
+
+    .eyebrow{
+        font-size:10px;
+        padding:5px 8px;
+    }
+
+    .workspace-actions{
+        flex-wrap:nowrap;
+        gap:4px;
+    }
+
+    .action-btn,
+    .action-btn.icon-only,
+    .panel-toggle{
+        width:36px;
+        min-width:36px;
+        height:36px;
+        border-radius:10px;
+        padding:0;
+    }
+
+    .panel-toggle-float::after{
+        display:none;
+    }
+
+    .board-toolbar{
+        margin:0 10px;
+        padding:6px;
+        gap:6px;
+    }
+
+    .toolbar-cluster{
+        gap:6px;
+    }
+
+    .toolbar-cluster input[type="text"]{
+        width:150px;
+        max-width:100%;
+    }
+
+    .zoom-badge{
+        min-width:54px;
+        height:36px;
+        padding:0 8px;
+        font-size:11px;
+    }
+
+    .board-wrap{
+        padding:0 10px 10px;
+    }
+
+    #canvas{
+        border-radius:6px;
+        box-shadow:0 14px 28px rgba(15,23,42,.14);
+    }
+}
+
+@media (max-width:480px){
+    .main-content{
+        padding-left:6px;
+        padding-right:6px;
+    }
+
+    .tool-grid{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+
+    .workspace-header{
+        flex-direction:column;
+        align-items:stretch;
+    }
+
+    .workspace-actions{
+        justify-content:space-between;
+    }
+
+    .workspace-actions .action-btn{
+        flex:1;
+    }
+
+    .board-toolbar{
+        flex-direction:column;
+        align-items:stretch;
+    }
+
+    .toolbar-cluster,
+    .zoom-controls{
+        width:100%;
+        justify-content:space-between;
+    }
+
+    .toolbar-cluster input[type="text"]{
+        flex:1;
+        width:auto;
     }
 }
 </style>
@@ -1015,8 +1202,8 @@ body.exporting #canvas::before{
             <div class="panel-head compact-head">
                 <div class="panel-head-row">
                     <span class="eyebrow">Drag and Drop</span>
-                    <button type="button" class="panel-toggle" id="hideLeftPanelBtn" aria-label="Hide certificate builder">
-                        <i class="fas fa-bars" aria-hidden="true"></i>
+                    <button type="button" class="panel-toggle" id="hideLeftPanelBtn" aria-label="Hide drag and drop certificate builder" title="Hide tools">
+                        <i class="fas fa-toolbox" aria-hidden="true"></i>
                     </button>
                 </div>
                 <div class="panel-head-main">
@@ -1338,8 +1525,8 @@ body.exporting #canvas::before{
             </div>
         </aside>
     </div>
-    <button type="button" class="panel-toggle panel-toggle-float" id="showLeftPanelBtn" aria-label="Show certificate builder">
-        <i class="fas fa-bars" aria-hidden="true"></i>
+    <button type="button" class="panel-toggle panel-toggle-float" id="showLeftPanelBtn" aria-label="Show drag and drop certificate builder" title="Show tools">
+        <i class="fas fa-toolbox" aria-hidden="true"></i>
     </button>
 </div>
 
@@ -1620,9 +1807,9 @@ function applyCanvasScale() {
     const style = window.getComputedStyle(boardStage);
     const horizontalPadding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
     const verticalPadding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
-    const availableWidth = Math.max(320, boardStage.clientWidth - horizontalPadding);
+    const availableWidth = Math.max(160, boardStage.clientWidth - horizontalPadding);
     const viewportTop = boardStage.getBoundingClientRect().top;
-    const availableHeight = Math.max(280, window.innerHeight - viewportTop - 36 - verticalPadding);
+    const availableHeight = Math.max(180, window.innerHeight - viewportTop - 12 - verticalPadding);
 
     fitCanvasScale = Math.min(
         availableWidth / BASE_CANVAS_WIDTH,
@@ -1636,8 +1823,8 @@ function applyCanvasScale() {
     canvas.style.transform = `scale(${currentCanvasScale})`;
     boardStage.style.minHeight = `${Math.round(BASE_CANVAS_HEIGHT * currentCanvasScale) + verticalPadding}px`;
     boardStage.classList.toggle('is-centered', canvasViewport.offsetWidth <= availableWidth + 1);
-    boardStage.scrollLeft = Math.max(0, Math.min(boardStage.scrollLeft, boardStage.scrollWidth - boardStage.clientWidth));
-    boardStage.scrollTop = Math.max(0, Math.min(boardStage.scrollTop, boardStage.scrollHeight - boardStage.clientHeight));
+    boardStage.scrollLeft = 0;
+    boardStage.scrollTop = 0;
     updateZoomBadge();
 }
 

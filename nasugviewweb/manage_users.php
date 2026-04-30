@@ -105,8 +105,60 @@ body{
         margin-bottom:0;
     }
 
-    .table{
-        min-width:720px;
+    .table-responsive{
+        overflow:visible;
+    }
+
+    #usersTable thead{
+        display:none;
+    }
+
+    #usersTable,
+    #usersTable tbody,
+    #usersTable tr,
+    #usersTable td{
+        display:block;
+        width:100%;
+    }
+
+    #usersTable tr{
+        margin-bottom:1rem;
+        border:1px solid #e5e7eb;
+        border-radius:14px;
+        overflow:hidden;
+        background:#fff;
+    }
+
+    #usersTable td{
+        display:flex;
+        justify-content:space-between;
+        gap:1rem;
+        padding:.8rem 1rem;
+        text-align:right;
+        border-bottom:1px solid #f1f3f4;
+        overflow-wrap:anywhere;
+    }
+
+    #usersTable td:last-child{
+        border-bottom:0;
+    }
+
+    #usersTable td::before{
+        content:"";
+        color:#001a47;
+        font-weight:700;
+        text-align:left;
+        flex:0 0 42%;
+    }
+
+    #usersTable td:nth-child(1)::before{ content:"ID"; }
+    #usersTable td:nth-child(2)::before{ content:"Name"; }
+    #usersTable td:nth-child(3)::before{ content:"Username"; }
+    #usersTable td:nth-child(4)::before{ content:"Role"; }
+    #usersTable td:nth-child(5)::before{ content:"Actions"; }
+
+    .action-buttons{
+        justify-content:flex-end;
     }
 }
 </style>

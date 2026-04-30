@@ -168,6 +168,80 @@ button:hover{background:#001a47;}
 .phrase1{font-family:'ITC Benguiat Bold Condensed',serif;font-size:1.7rem;display:flex;gap:0.4rem;justify-content:center;}
 .star{color:var(--star-color); font-size:0.6rem;}
 .phrase2{font-size:1rem;margin-top:4px;opacity:0.9;}
+
+@media (max-width:760px){
+    body{
+        height:auto;
+        min-height:100vh;
+        padding:1rem;
+        align-items:flex-start;
+    }
+
+    .container{
+        width:100%;
+        max-width:430px;
+        min-height:0;
+        border-radius:20px;
+    }
+
+    .toggle-container{
+        display:none;
+    }
+
+    .form-container{
+        position:relative;
+        width:100%;
+        height:auto;
+        min-height:0;
+        transform:none !important;
+        transition:none;
+    }
+
+    .sign-in{
+        display:flex;
+    }
+
+    .sign-up{
+        display:none;
+        opacity:1;
+        z-index:2;
+    }
+
+    .container.active .sign-in{
+        display:none;
+    }
+
+    .container.active .sign-up{
+        display:flex;
+    }
+
+    .form-scroll{
+        overflow:visible;
+        padding:20px;
+    }
+
+    .sign-up .form-scroll{
+        height:auto;
+        overflow:visible;
+    }
+
+    .form-actions{
+        padding:10px 20px 20px;
+    }
+
+    form img{
+        width:min(220px, 80%);
+        align-self:center;
+    }
+}
+
+@media (max-width:420px){
+    .options-row{
+        flex-direction:column;
+        align-items:flex-start;
+        gap:8px;
+    }
+}
 </style>
 </head>
 

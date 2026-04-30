@@ -153,8 +153,63 @@ body {
         border-radius:16px;
     }
 
-    .table{
-        min-width:900px;
+    .table-responsive{
+        overflow:visible;
+    }
+
+    #businessTable thead{
+        display:none;
+    }
+
+    #businessTable,
+    #businessTable tbody,
+    #businessTable tr,
+    #businessTable td{
+        display:block;
+        width:100%;
+    }
+
+    #businessTable tr{
+        margin-bottom:1rem;
+        border:1px solid #e5e7eb;
+        border-radius:14px;
+        overflow:hidden;
+        background:#fff;
+    }
+
+    #businessTable td{
+        display:flex;
+        justify-content:space-between;
+        gap:1rem;
+        padding:.8rem 1rem;
+        text-align:right;
+        border-bottom:1px solid #f1f3f4;
+        overflow-wrap:anywhere;
+    }
+
+    #businessTable td:last-child{
+        border-bottom:0;
+    }
+
+    #businessTable td::before{
+        content:"";
+        color:#001a47;
+        font-weight:700;
+        text-align:left;
+        flex:0 0 42%;
+    }
+
+    #businessTable td:nth-child(1)::before{ content:"#"; }
+    #businessTable td:nth-child(2)::before{ content:"Business Name"; }
+    #businessTable td:nth-child(3)::before{ content:"Owner Name"; }
+    #businessTable td:nth-child(4)::before{ content:"Address"; }
+    #businessTable td:nth-child(5)::before{ content:"Gender"; }
+    #businessTable td:nth-child(6)::before{ content:"Description"; }
+    #businessTable td:nth-child(7)::before{ content:"Phone"; }
+    #businessTable td:nth-child(8)::before{ content:"Actions"; }
+
+    #businessTable .d-flex{
+        justify-content:flex-end;
     }
 }
 
