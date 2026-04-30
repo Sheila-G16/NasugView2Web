@@ -193,8 +193,72 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
 .shape-2 { width: 60px; height: 60px; bottom: 5%; right: 80%; animation-delay: 1s; }
 @keyframes float { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-20px) rotate(180deg); } }
 
-.chart-wrapper { overflow-x: auto; padding-bottom: 10px; }
-#eventsChart { height: 250px; min-width: 1100px; }
+.chart-wrapper { overflow:hidden; padding-bottom: 10px; }
+#eventsChart { height: 250px; width:100% !important; display:block; }
+
+@media (max-width:992px){
+    .main-content{
+        margin-left:0;
+        padding:5rem 1rem 2rem;
+    }
+
+    .content-wrapper{
+        max-width:100%;
+    }
+
+    .welcome-card,
+    .dashboard-card{
+        border-radius:16px;
+        padding:1.25rem;
+    }
+
+    .welcome-card .text-end{
+        text-align:left !important;
+        margin-top:1rem;
+    }
+
+    .dashboard-card:hover,
+    .quick-action-btn:hover{
+        transform:none;
+    }
+}
+
+@media (max-width:576px){
+    .main-content{
+        padding-left:.75rem;
+        padding-right:.75rem;
+    }
+
+    .stats-grid{
+        grid-template-columns:1fr;
+        gap:1rem;
+    }
+
+    .welcome-card h3{
+        font-size:1.35rem;
+    }
+
+    .card-icon{
+        width:56px;
+        height:56px;
+        margin-bottom:1rem;
+        font-size:1.45rem;
+    }
+
+    .card-value{
+        font-size:1.85rem;
+    }
+
+    .row.align-items-center.mb-3 > [class*="col-"]{
+        width:100%;
+        text-align:left !important;
+    }
+
+    .filter-wrap{
+        justify-content:flex-start;
+        margin-top:.75rem;
+    }
+}
 </style>
 </head>
 <body>
@@ -310,11 +374,11 @@ const eventsChart = new Chart(ctx, {
             backgroundColor: '#001a47',
             borderColor: '#001a47',
             borderWidth: 1,
-            barThickness: 40
+            maxBarThickness: 40
         }]
     },
     options: {
-        responsive: false,
+        responsive: true,
         maintainAspectRatio: false,
         plugins: {
             legend: { display: false },

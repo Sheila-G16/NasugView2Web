@@ -135,13 +135,62 @@ textarea.form-control { height:120px; resize:none; }
         margin-left:0 !important;
     }
 
-    .table-full {
-        overflow-x:auto;
-        -webkit-overflow-scrolling:touch;
+    .table-responsive {
+        overflow:visible;
     }
 
-    .table {
-        min-width:880px;
+    #eventsTable thead {
+        display:none;
+    }
+
+    #eventsTable,
+    #eventsTable tbody,
+    #eventsTable tr,
+    #eventsTable td {
+        display:block;
+        width:100%;
+    }
+
+    #eventsTable tr {
+        margin-bottom:1rem;
+        border:1px solid #e5e7eb;
+        border-radius:14px;
+        overflow:hidden;
+        background:#fff;
+    }
+
+    #eventsTable td {
+        display:flex;
+        justify-content:space-between;
+        gap:1rem;
+        padding:.8rem 1rem;
+        text-align:right;
+        border-bottom:1px solid #f1f3f4;
+        overflow-wrap:anywhere;
+    }
+
+    #eventsTable td:last-child {
+        border-bottom:0;
+    }
+
+    #eventsTable td::before {
+        content:"";
+        color:#001a47;
+        font-weight:700;
+        text-align:left;
+        flex:0 0 42%;
+    }
+
+    #eventsTable td:nth-child(1)::before { content:"Event Title"; }
+    #eventsTable td:nth-child(2)::before { content:"Start & End Date"; }
+    #eventsTable td:nth-child(3)::before { content:"Duration"; }
+    #eventsTable td:nth-child(4)::before { content:"Event Code"; }
+    #eventsTable td:nth-child(5)::before { content:"Status"; }
+    #eventsTable td:nth-child(6)::before { content:"Remarks"; }
+    #eventsTable td:nth-child(7)::before { content:"Actions"; }
+
+    .action-buttons {
+        justify-content:flex-end;
     }
 }
 

@@ -318,6 +318,58 @@ padding:1rem 1.5rem;
 margin-bottom:1.5rem;
 }
 
+@media (max-width:992px){
+    .main-content{
+        margin-left:0;
+    }
+
+    .content-wrapper{
+        padding:5rem 1rem 2rem;
+    }
+
+    .settings-container{
+        grid-template-columns:1fr;
+        gap:1rem;
+    }
+
+    .profile-sidebar{
+        position:static;
+    }
+}
+
+@media (max-width:576px){
+    .content-wrapper{
+        padding-left:.75rem;
+        padding-right:.75rem;
+    }
+
+    .page-title h1{
+        font-size:1.55rem;
+    }
+
+    .profile-sidebar,
+    .settings-form{
+        padding:1.25rem;
+        border-radius:16px;
+    }
+
+    .profile-picture{
+        width:112px;
+        height:112px;
+        font-size:2.25rem;
+    }
+
+    .form-actions{
+        flex-direction:column;
+    }
+
+    .btn-save,
+    .btn-reset{
+        width:100%;
+        text-align:center;
+    }
+}
+
 </style>
 </head>
 

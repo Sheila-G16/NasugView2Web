@@ -293,6 +293,55 @@ a:hover{
     opacity:0.9;
     text-align:center;
 }
+
+@media (max-width:760px){
+    body{
+        height:auto;
+        min-height:100vh;
+        padding:1rem;
+        align-items:flex-start;
+    }
+
+    .container{
+        width:100%;
+        max-width:430px;
+        min-height:0;
+        border-radius:20px;
+    }
+
+    .toggle-container{
+        display:none;
+    }
+
+    .form-container{
+        position:relative;
+        width:100%;
+        height:auto;
+        min-height:0;
+        padding:2rem 0;
+    }
+
+    form{
+        padding:0 20px;
+    }
+
+    form img{
+        width:min(220px, 80%);
+    }
+}
+
+@media (max-width:420px){
+    .options-row{
+        flex-direction:column;
+        align-items:flex-start;
+        gap:8px;
+    }
+
+    button{
+        width:100%;
+        margin-top:24px;
+    }
+}
 </style>
 </head>
 

@@ -155,6 +155,102 @@ body{
     font-weight:400;
     font-size:0.875rem;
 }
+
+@media (max-width:992px){
+    .main-content{
+        margin-left:0;
+        padding:5rem 1rem 2rem;
+    }
+}
+
+@media (max-width:768px){
+    .card{
+        padding:1.25rem;
+        border-radius:16px;
+    }
+
+    .row.mb-4{
+        row-gap:1rem;
+    }
+
+    .card > .d-flex{
+        flex-direction:column;
+        gap:.75rem;
+    }
+
+    #searchInput,
+    .btn-submit{
+        width:100%;
+        margin-left:0 !important;
+    }
+
+    #centerTable thead{
+        display:none;
+    }
+
+    #centerTable,
+    #centerTable tbody,
+    #centerTable tr,
+    #centerTable td{
+        display:block;
+        width:100%;
+    }
+
+    #centerTable tr{
+        margin-bottom:1rem;
+        border:1px solid #e5e7eb;
+        border-radius:14px;
+        overflow:hidden;
+        background:#fff;
+    }
+
+    #centerTable td{
+        display:flex;
+        justify-content:space-between;
+        gap:1rem;
+        padding:.8rem 1rem;
+        text-align:right;
+        border-bottom:1px solid #f1f3f4;
+        overflow-wrap:anywhere;
+    }
+
+    #centerTable td:last-child{
+        border-bottom:0;
+    }
+
+    #centerTable td::before{
+        content:"";
+        color:#001a47;
+        font-weight:700;
+        text-align:left;
+        flex:0 0 42%;
+    }
+
+    #centerTable td:nth-child(1)::before{ content:"Branch Name"; }
+    #centerTable td:nth-child(2)::before{ content:"Municipality"; }
+    #centerTable td:nth-child(3)::before{ content:"Province"; }
+    #centerTable td:nth-child(4)::before{ content:"Address"; }
+    #centerTable td:nth-child(5)::before{ content:"Contact"; }
+    #centerTable td:nth-child(6)::before{ content:"Email"; }
+    #centerTable td:nth-child(7)::before{ content:"Officer"; }
+    #centerTable td:nth-child(8)::before{ content:"Actions"; }
+
+    .action-buttons{
+        justify-content:flex-end;
+    }
+
+    #pagination-container{
+        flex-direction:column;
+        align-items:stretch !important;
+    }
+}
+
+@media (max-width:576px){
+    .main-content{
+        padding-left:.75rem;
+        padding-right:.75rem;
+    }
+}
 </style>
 </head>
 

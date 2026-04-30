@@ -39,6 +39,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
 
 <!-- Sidebar -->
+<button class="mobile-sidebar-toggle" type="button" aria-label="Open menu" aria-expanded="false">
+    <i class="fas fa-bars"></i>
+</button>
+<div class="sidebar-backdrop" aria-hidden="true"></div>
+
 <div class="sidebar">
 
     <div class="sidebar-header">
@@ -204,10 +209,109 @@ body, .sidebar, .sidebar a, .user-info {
     border-radius: 3px;
 }
 
-@media (max-width: 768px) {
+body.sidebar-open {
+    overflow:hidden;
+}
+
+.mobile-sidebar-toggle {
+    display:none;
+    position:fixed;
+    top:14px;
+    left:14px;
+    width:44px;
+    height:44px;
+    border:0;
+    border-radius:12px;
+    background:linear-gradient(135deg,var(--gradient-start),var(--gradient-end));
+    color:#fff;
+    box-shadow:0 10px 24px rgba(0,26,71,0.24);
+    z-index:1201;
+    align-items:center;
+    justify-content:center;
+}
+
+.sidebar-backdrop {
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(15,23,42,0.45);
+    z-index:999;
+}
+
+@media (max-width: 992px) {
+    .mobile-sidebar-toggle {
+        display:flex;
+    }
+
     .sidebar {
         transform: translateX(-100%);
-        width: 280px;
+        width: min(280px, 86vw);
+        transition:transform .25s ease;
+    }
+
+    body.sidebar-open .sidebar {
+        transform:translateX(0);
+    }
+
+    body.sidebar-open .sidebar-backdrop {
+        display:block;
+    }
+
+    .main-content {
+        margin-left:0 !important;
+        padding-top:76px !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .sidebar-header {
+        padding:2rem 1rem 1.5rem;
+    }
+
+    .logo-img {
+        width:130px;
+    }
+
+    .sidebar-menu ul li a {
+        padding:.9rem 1.1rem;
     }
 }
 </style>
+
+<script>
+(function () {
+    const toggle = document.querySelector('.mobile-sidebar-toggle');
+    const backdrop = document.querySelector('.sidebar-backdrop');
+    const sidebarLinks = document.querySelectorAll('.sidebar-menu a');
+
+    if (!toggle || !backdrop) {
+        return;
+    }
+
+    function setSidebar(open) {
+        document.body.classList.toggle('sidebar-open', open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        toggle.innerHTML = open ? '<i class="fas fa-times"></i>' : '<i class="fas fa-bars"></i>';
+    }
+
+    toggle.addEventListener('click', function () {
+        setSidebar(!document.body.classList.contains('sidebar-open'));
+    });
+
+    backdrop.addEventListener('click', function () {
+        setSidebar(false);
+    });
+
+    sidebarLinks.forEach(function (link) {
+        link.addEventListener('click', function () {
+            setSidebar(false);
+        });
+    });
+
+    window.addEventListener('resize', function () {
+        if (window.innerWidth > 992) {
+            setSidebar(false);
+        }
+    });
+})();
+</script>

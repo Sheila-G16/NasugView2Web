@@ -17,6 +17,7 @@ $centers = $conn->query("SELECT * FROM negosyo_centers ORDER BY branch_name ASC"
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>User Management - NasugView</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -32,6 +33,35 @@ body{font-family:Poppins;background:#f0f4ff;}
 .btn-submit:hover{background:#00308a;}
 .btn-action{width:36px;height:36px;border-radius:10px;background:#001a47;color:#fff;border:none;display:flex;align-items:center;justify-content:center;}
 .action-buttons{display:flex;gap:5px;}
+
+@media (max-width:992px){
+    .main-content{margin-left:0;padding:5rem 1rem 2rem;}
+}
+
+@media (max-width:768px){
+    .card{padding:1.25rem;border-radius:16px;}
+    .card > .d-flex{flex-direction:column;gap:.75rem;}
+    #searchInput,.btn-submit{width:100%;margin-left:0 !important;}
+
+    #userTable thead{display:none;}
+    #userTable,#userTable tbody,#userTable tr,#userTable td{display:block;width:100%;}
+    #userTable tr{margin-bottom:1rem;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;background:#fff;}
+    #userTable td{display:flex;justify-content:space-between;gap:1rem;padding:.8rem 1rem;text-align:right;border-bottom:1px solid #f1f3f4;overflow-wrap:anywhere;}
+    #userTable td:last-child{border-bottom:0;}
+    #userTable td::before{content:"";color:#001a47;font-weight:700;text-align:left;flex:0 0 42%;}
+    #userTable td:nth-child(1)::before{content:"Name";}
+    #userTable td:nth-child(2)::before{content:"Email";}
+    #userTable td:nth-child(3)::before{content:"Designation";}
+    #userTable td:nth-child(4)::before{content:"Center";}
+    #userTable td:nth-child(5)::before{content:"Municipality";}
+    #userTable td:nth-child(6)::before{content:"Province";}
+    #userTable td:nth-child(7)::before{content:"Actions";}
+    .action-buttons{justify-content:flex-end;}
+}
+
+@media (max-width:576px){
+    .main-content{padding-left:.75rem;padding-right:.75rem;}
+}
 </style>
 </head>
 <body>
@@ -168,7 +198,17 @@ r.style.display=r.textContent.toLowerCase().includes(v)?'':'none';
 
 // ADD USER
 document.getElementById('addUserForm').addEventListener('submit',function(e){
-
+e.preventDefault();
+fetch('create_user_process.php',{method:'POST',body:new FormData(this)})
+.then(res=>res.json())
+.then(data=>{
+if(data.success){
+Swal.fire('Created!','Temporary password: '+data.temp,'success').then(()=>location.reload());
+}else{
+Swal.fire('Error',data.error || 'Unable to create user.','error');
+}
+});
+});
 
 // EDIT USER OPEN
 document.querySelectorAll('.editBtn').forEach(btn=>{

@@ -167,14 +167,9 @@ textarea.form-control { height:120px; resize:none; }
         font-size:1.35rem;
     }
 
-    .nav-tabs {
-        flex-wrap:nowrap;
-        overflow-x:auto;
-        overflow-y:hidden;
-    }
-
     .nav-tabs .nav-link {
-        white-space:nowrap;
+        white-space:normal;
+        text-align:center;
     }
 
     .mt-3 .btn {

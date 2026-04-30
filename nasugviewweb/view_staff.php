@@ -95,8 +95,59 @@ body{
         margin-bottom:0;
     }
 
-    .table{
-        min-width:620px;
+    .table-responsive{
+        overflow:visible;
+    }
+
+    #staffTable thead{
+        display:none;
+    }
+
+    #staffTable,
+    #staffTable tbody,
+    #staffTable tr,
+    #staffTable td{
+        display:block;
+        width:100%;
+    }
+
+    #staffTable tr{
+        margin-bottom:1rem;
+        border:1px solid #e5e7eb;
+        border-radius:14px;
+        overflow:hidden;
+        background:#fff;
+    }
+
+    #staffTable td{
+        display:flex;
+        justify-content:space-between;
+        gap:1rem;
+        padding:.8rem 1rem;
+        text-align:right;
+        border-bottom:1px solid #f1f3f4;
+        overflow-wrap:anywhere;
+    }
+
+    #staffTable td:last-child{
+        border-bottom:0;
+    }
+
+    #staffTable td::before{
+        content:"";
+        color:#001a47;
+        font-weight:700;
+        text-align:left;
+        flex:0 0 42%;
+    }
+
+    #staffTable td:nth-child(1)::before{ content:"ID"; }
+    #staffTable td:nth-child(2)::before{ content:"Name"; }
+    #staffTable td:nth-child(3)::before{ content:"Username"; }
+    #staffTable td:nth-child(4)::before{ content:"Actions"; }
+
+    .action-buttons{
+        justify-content:flex-end;
     }
 }
 </style>
