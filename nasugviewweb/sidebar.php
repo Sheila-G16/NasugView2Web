@@ -167,7 +167,7 @@ body, .sidebar, .sidebar a, .user-info {
     color:rgba(255,255,255,0.85);
     text-decoration:none;
     border-left:4px solid transparent;
-    border-radius:0 12px 12px 0;
+    border-radius:0 8px 8px 0;
     font-weight:500;
     transition:0.3s;
 }
@@ -202,7 +202,7 @@ body.sidebar-open {
     width:44px;
     height:44px;
     border:0;
-    border-radius:12px;
+    border-radius:8px;
     background:linear-gradient(135deg,var(--gradient-start),var(--gradient-end));
     color:#fff;
     box-shadow:0 10px 24px rgba(0,26,71,0.24);

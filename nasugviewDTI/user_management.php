@@ -27,7 +27,7 @@ $centers = $conn->query("SELECT * FROM negosyo_centers ORDER BY branch_name ASC"
 <style>
 body{font-family:Poppins;background:#f0f4ff;}
 .main-content{margin-left:250px;padding:2rem;}
-.card{border-left:6px solid #001a47;border-radius:18px;padding:2rem;background:#fff;box-shadow:0 8px 25px rgba(0,0,0,0.08);}
+.card{border-left:6px solid #001a47;border-radius:10px;padding:2rem;background:#fff;box-shadow:0 8px 25px rgba(0,0,0,0.08);}
 .table th{background:linear-gradient(135deg,#001a47,#00308a);color:white;}
 .btn-submit{background:#001a47;color:#fff;border-radius:10px;padding:8px 20px;border:none;}
 .btn-submit:hover{background:#00308a;}
@@ -39,13 +39,13 @@ body{font-family:Poppins;background:#f0f4ff;}
 }
 
 @media (max-width:768px){
-    .card{padding:1.25rem;border-radius:16px;}
+    .card{padding:1.25rem;border-radius:10px;}
     .card > .d-flex{flex-direction:column;gap:.75rem;}
     #searchInput,.btn-submit{width:100%;margin-left:0 !important;}
 
     #userTable thead{display:none;}
     #userTable,#userTable tbody,#userTable tr,#userTable td{display:block;width:100%;}
-    #userTable tr{margin-bottom:1rem;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;background:#fff;}
+    #userTable tr{margin-bottom:1rem;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#fff;}
     #userTable td{display:flex;justify-content:space-between;gap:1rem;padding:.8rem 1rem;text-align:right;border-bottom:1px solid #f1f3f4;overflow-wrap:anywhere;}
     #userTable td:last-child{border-bottom:0;}
     #userTable td::before{content:"";color:#001a47;font-weight:700;text-align:left;flex:0 0 42%;}

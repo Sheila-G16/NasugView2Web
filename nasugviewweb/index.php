@@ -118,7 +118,7 @@ body{
     max-width:95%;
     min-height:500px;
     background:#fff;
-    border-radius:30px;
+    border-radius:10px;
     overflow:hidden;
     position:relative;
     box-shadow: 0 20px 50px rgba(0, 15, 46, 0.7), 0 10px 30px rgba(0, 15, 46, 0.5);
@@ -306,7 +306,7 @@ a:hover{
         width:100%;
         max-width:430px;
         min-height:0;
-        border-radius:20px;
+        border-radius:10px;
     }
 
     .toggle-container{

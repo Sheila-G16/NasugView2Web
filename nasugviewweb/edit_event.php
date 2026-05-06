@@ -17,6 +17,10 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
     $end   = $_POST['end'] ?? '';
     $address = $_POST['address'] ?? '';
     $mode = $_POST['mode'] ?? '';
+    $google_meet_link = trim($_POST['google_meet_link'] ?? '');
+    if ($mode !== 'Webinar') {
+        $google_meet_link = '';
+    }
     $speaker = $_POST['speaker'] ?? '';
     $audience = $_POST['audience'] ?? '';
     $budget = $_POST['budget'] ?? '';
@@ -27,15 +31,15 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
     $stmt = $conn->prepare("
         UPDATE events SET
         title=?, start_date_and_time=?, end_date_and_time=?, address=?, 
-        mode_of_delivery=?, speaker=?, audience=?, 
+        mode_of_delivery=?, google_meet_link=?, speaker=?, audience=?, 
         budget=?, funding_source=?, description=?
         WHERE id=?
     ");
 
-    // Bind params correctly (10 strings + 1 int)
+    // Bind params correctly (11 strings + 1 int)
     $stmt->bind_param(
-        "ssssssssssi",
-        $title, $start, $end, $address, $mode, $speaker,
+        "sssssssssssi",
+        $title, $start, $end, $address, $mode, $google_meet_link, $speaker,
         $audience, $budget, $funding, $description, $id
     );
 
@@ -97,7 +101,12 @@ form {
     value="<?= isset($event['end_date_and_time']) ? date('Y-m-d\TH:i', strtotime($event['end_date_and_time'])) : '' ?>">
 
     <input class="form-control mb-2" name="address" value="<?= htmlspecialchars($event['address'] ?? '') ?>" placeholder="Address / Venue">
-    <input class="form-control mb-2" name="mode" value="<?= htmlspecialchars($event['mode_of_delivery'] ?? '') ?>" placeholder="Mode of Delivery">
+    <select class="form-control mb-2" name="mode" id="modeOfDelivery">
+        <option value="">Select Mode</option>
+        <option value="Seminar" <?= (($event['mode_of_delivery'] ?? '') === 'Seminar') ? 'selected' : '' ?>>Seminar</option>
+        <option value="Webinar" <?= (($event['mode_of_delivery'] ?? '') === 'Webinar') ? 'selected' : '' ?>>Webinar</option>
+    </select>
+    <input type="url" class="form-control mb-2" name="google_meet_link" id="googleMeetLink" value="<?= htmlspecialchars($event['google_meet_link'] ?? '') ?>" placeholder="Google Meet Link">
     <input class="form-control mb-2" name="speaker" value="<?= htmlspecialchars($event['speaker'] ?? '') ?>" placeholder="Resource Speaker">
     <input class="form-control mb-2" name="audience" value="<?= htmlspecialchars($event['audience'] ?? '') ?>" placeholder="Target Audience">
     <input class="form-control mb-2" name="budget" value="<?= htmlspecialchars($event['budget'] ?? '') ?>" placeholder="Budget">
@@ -110,6 +119,20 @@ form {
 </form>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+const modeOfDelivery = document.getElementById('modeOfDelivery');
+const googleMeetLink = document.getElementById('googleMeetLink');
+
+function toggleGoogleMeetLink() {
+    const isWebinar = modeOfDelivery.value === 'Webinar';
+    googleMeetLink.style.display = isWebinar ? '' : 'none';
+    googleMeetLink.required = isWebinar;
+    if (!isWebinar) googleMeetLink.value = '';
+}
+
+modeOfDelivery.addEventListener('change', toggleGoogleMeetLink);
+toggleGoogleMeetLink();
+</script>
 <?php if($updated): ?>
 <script>
 Swal.fire({

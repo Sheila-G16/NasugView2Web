@@ -205,7 +205,7 @@ gap:2rem;
 
 .profile-sidebar{
 background:white;
-border-radius:20px;
+border-radius:10px;
 padding:2.5rem;
 box-shadow:0 5px 25px rgba(0,0,0,0.08);
 text-align:center;
@@ -258,7 +258,7 @@ font-weight:600;
 
 .settings-form{
 background:white;
-border-radius:20px;
+border-radius:10px;
 padding:2.5rem;
 box-shadow:0 5px 25px rgba(0,0,0,0.08);
 }
@@ -276,7 +276,7 @@ border-bottom:2px solid #f1f3f4;
 }
 
 .form-control{
-border-radius:12px;
+border-radius:8px;
 border:2px solid #e8f0fe;
 padding:0.75rem 1rem;
 background:#fafbfc;
@@ -297,7 +297,7 @@ margin-top:2rem;
 .btn-save{
 background:linear-gradient(135deg,var(--primary-color),var(--gradient-end));
 border:none;
-border-radius:12px;
+border-radius:8px;
 padding:1rem 2rem;
 color:white;
 font-weight:600;
@@ -307,13 +307,13 @@ font-weight:600;
 background:transparent;
 border:2px solid #6c757d;
 color:#6c757d;
-border-radius:12px;
+border-radius:8px;
 padding:1rem 2rem;
 font-weight:600;
 }
 
 .alert{
-border-radius:12px;
+border-radius:8px;
 padding:1rem 1.5rem;
 margin-bottom:1.5rem;
 }
@@ -350,7 +350,7 @@ margin-bottom:1.5rem;
     .profile-sidebar,
     .settings-form{
         padding:1.25rem;
-        border-radius:16px;
+        border-radius:10px;
     }
 
     .profile-picture{

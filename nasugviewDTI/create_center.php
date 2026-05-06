@@ -96,7 +96,7 @@ padding:30px;
 max-width:900px;
 margin:auto;
 padding:2rem;
-border-radius:18px;
+border-radius:10px;
 border-left:7px solid #001a47;
 box-shadow:0 8px 30px rgba(0,0,0,0.08);
 }
@@ -137,7 +137,7 @@ background:#00308a;
 
     .card{
         padding:1.25rem;
-        border-radius:16px;
+        border-radius:10px;
     }
 }
 

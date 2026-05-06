@@ -224,6 +224,136 @@ if ($leadingBusinessStmt) {
         $leadingBusinesses[] = $row;
     }
 }
+
+$csfOverview = [
+    'office' => 'Bureau/Office',
+    'process' => 'Business Advisory and Client Support',
+    'period' => 'For the period [Month, DD, YYYY]',
+    'total_responses' => 31,
+    'total_clients' => 35,
+    'retrieval_rate' => '88.57%',
+    'overall_satisfaction' => '91.90%',
+    'adjectival_rating' => 'Very Satisfactory'
+];
+
+$tabulationRows = [
+    [1, 'Client 1', '20-34', 'M', 'Citizen', 1, 1, 1, 5, 5, 5, 5, 4, '-', 4, 5, 4],
+    [2, 'Client 2', '19 or lower', 'F', 'Business', 1, 1, 1, 5, 5, 5, 5, 4, '-', 4, 5, 4],
+    [3, 'Client 3', '50-64', 'M', 'Citizen', 1, 1, 1, 5, 5, 5, 5, 4, '-', 4, 5, 4],
+    [4, 'Client 4', '20-34', 'M', 'Business', 1, 1, 1, 5, 5, 5, 5, 4, '-', 4, 5, 4],
+    [5, 'Client 5', '20-34', 'M', 'Citizen', 1, 1, 1, 5, 5, 5, 5, 5, '-', 4, 5, 5],
+    [6, 'Client 6', '50-64', 'M', 'Business', 1, 1, 1, 5, 5, 5, 5, 5, '-', 4, 5, 5],
+    [7, 'Client 7', '50-64', 'F', 'Business', 1, 3, 1, 5, 5, 5, 5, 5, '-', 4, 5, 5],
+    [8, 'Client 8', '35-49', 'F', 'Business', 1, 1, 1, 5, 5, 5, 5, 5, '-', 4, 5, 5]
+];
+
+$speakerRows = [
+    [1, 'Client 1', '20-34', 'M', 'Citizen', 4, 5, 5, 5, 5, 4, 4, 4],
+    [2, 'Client 2', '19 or lower', 'F', 'Business', 4, 5, 5, 5, 5, 4, 4, 4],
+    [3, 'Client 3', '50-64', 'M', 'Citizen', 4, 5, 5, 5, 5, 4, 4, 4],
+    [4, 'Client 4', '20-34', 'M', 'Business', 4, 5, 5, 5, 5, 4, 4, 4],
+    [5, 'Client 5', '20-34', 'M', 'Citizen', 5, 5, 5, 5, 5, 5, 5, 5],
+    [6, 'Client 6', '50-64', 'M', 'Business', 4, 5, 5, 5, 5, 5, 5, 5]
+];
+
+$csfTables = [
+    [
+        'title' => "CC1 - Awareness of the Citizen's Charter",
+        'theme' => 'green',
+        'rows' => [
+            ['(1) I know what a CC is and I saw this office’s CC.', 30, '96.77%'],
+            ['(2) I know what a CC is but I did not see this office’s CC.', 0, '0.00%'],
+            ['(3) I learned of the CC only when I saw this office’s CC.', 0, '0.00%'],
+            ['(4) I do not know what a CC is and I did not see one.', 0, '0.00%'],
+            ['(-) Not Applicable', 1, '3.23%']
+        ],
+        'total' => [31, '100.00%']
+    ],
+    [
+        'title' => 'Sex Disaggregation',
+        'theme' => 'blue',
+        'rows' => [
+            ['Male', 17, '54.84%'],
+            ['Female', 13, '41.94%'],
+            ['Did not specify', 1, '3.23%']
+        ],
+        'total' => [31, '100.00%']
+    ],
+    [
+        'title' => 'Level of Satisfaction',
+        'theme' => 'blue',
+        'rows' => [
+            ['Strongly Agree', '', '55.24%'],
+            ['Agree', '', '36.67%'],
+            ['Neither Agree nor Disagree', '', '7.62%'],
+            ['Disagree', '', '0.48%'],
+            ['Strongly Disagree', '', '0.00%']
+        ],
+        'summary' => [
+            ['Overall Satisfaction', '91.90%'],
+            ['Adjectival Rating', 'Very Satisfactory']
+        ]
+    ],
+    [
+        'title' => "CC2 - Visibility of the Citizen's Charter",
+        'theme' => 'green',
+        'rows' => [
+            ['(1) Easy to see', 29, '93.55%'],
+            ['(2) Somewhat easy to see', 0, '0.00%'],
+            ['(3) Difficult to see', 1, '3.23%'],
+            ['(4) Not visible', 0, '0.00%'],
+            ['(5) N/A', 0, '0.00%'],
+            ['(-) Not Applicable', 1, '3.23%']
+        ],
+        'total' => [31, '100.00%']
+    ],
+    [
+        'title' => 'Age',
+        'theme' => 'blue',
+        'rows' => [
+            ['19 or lower', 2, '6.45%'],
+            ['20-34', 13, '41.94%'],
+            ['35-49', 9, '29.03%'],
+            ['50-64', 6, '19.35%'],
+            ['65 or higher', 0, '0.00%'],
+            ['Did not specify', 1, '3.23%']
+        ],
+        'total' => [31, '100.00%']
+    ],
+    [
+        'title' => "CC3 - Usefulness of the Citizen's Charter",
+        'theme' => 'green',
+        'rows' => [
+            ['(1) Helped very much', 30, '96.77%'],
+            ['(2) Somewhat helped', 0, '0.00%'],
+            ['(3) Did not help', 0, '0.00%'],
+            ['(-) Not Applicable', 1, '3.23%']
+        ],
+        'total' => [31, '100.00%']
+    ],
+    [
+        'title' => 'Client Type',
+        'theme' => 'blue',
+        'rows' => [
+            ['Citizen', 6, '19.35%'],
+            ['Business', 18, '58.06%'],
+            ['Government', 6, '19.35%'],
+            ['Did not specify', 1, '3.23%']
+        ],
+        'total' => [31, '100.00%']
+    ]
+];
+
+$dimensionSummaries = [
+    ['Responsiveness', '93.55%', 'Very Satisfactory'],
+    ['Reliability', '67.74%', 'Fair'],
+    ['Access & Facilities', '96.77%', 'Outstanding'],
+    ['Communication', '93.55%', 'Very Satisfactory'],
+    ['Costs', '0.00%', 'N/A'],
+    ['Integrity', '77.41%', 'Fair'],
+    ['Assurance', '96.77%', 'Outstanding'],
+    ['Outcome', '96.77%', 'Outstanding']
+];
 ?>
 
 <!DOCTYPE html>
@@ -253,15 +383,15 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
     margin:0;
     padding:0 10px;
 }
-.welcome-card { background:linear-gradient(135deg,var(--primary-color),var(--gradient-end)); color:white; border-radius:20px; padding:2.5rem; margin-bottom:2rem; box-shadow:0 10px 30px rgba(0,26,71,0.3); position:relative; overflow:hidden; }
+.welcome-card { background:linear-gradient(135deg,var(--primary-color),var(--gradient-end)); color:white; border-radius:10px; padding:2.5rem; margin-bottom:2rem; box-shadow:0 10px 30px rgba(0,26,71,0.3); position:relative; overflow:hidden; }
 .welcome-card::before { content:''; position:absolute; top:-50%; right:-20%; width:200px; height:200px; background:rgba(255,255,255,0.1); border-radius:50%; }
 .welcome-card::after { content:''; position:absolute; bottom:-30%; left:-10%; width:150px; height:150px; background:rgba(255,255,255,0.05); border-radius:50%; }
-.dashboard-card { background:white; border-radius:20px; padding:2rem; margin-bottom:1.5rem; box-shadow:0 5px 25px rgba(0,0,0,0.08); border:none; transition:all 0.3s ease; position:relative; overflow:hidden; }
+.dashboard-card { background:white; border-radius:10px; padding:2rem; margin-bottom:1.5rem; box-shadow:0 5px 25px rgba(0,0,0,0.08); border:none; transition:all 0.3s ease; position:relative; overflow:hidden; }
 .dashboard-card:hover { transform:translateY(-8px); box-shadow:0 15px 35px rgba(0,0,0,0.15); }
-.card-icon { width:70px; height:70px; border-radius:16px; display:flex; align-items:center; justify-content:center; margin-bottom:1.5rem; font-size:1.8rem; background:rgba(0,26,71,0.1); color:#001a47; }
+.card-icon { width:70px; height:70px; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-bottom:1.5rem; font-size:1.8rem; background:rgba(0,26,71,0.1); color:#001a47; }
 .card-value { font-size:2.2rem; font-weight:700; margin:0.5rem 0; background:linear-gradient(135deg,var(--primary-color),var(--gradient-end)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
 .card-title { font-weight:600; color:var(--primary-color); margin-bottom:1rem; font-size:1.2rem; }
-.quick-action-btn { background:linear-gradient(135deg,var(--primary-color),var(--gradient-end)); border:none; border-radius:12px; padding:1rem 1.5rem; font-weight:600; color:white; transition:all 0.3s ease; width:100%; margin-bottom:0.5rem; font-size:0.95rem; position:relative; overflow:hidden; }
+.quick-action-btn { background:linear-gradient(135deg,var(--primary-color),var(--gradient-end)); border:none; border-radius:8px; padding:1rem 1.5rem; font-weight:600; color:white; transition:all 0.3s ease; width:100%; margin-bottom:0.5rem; font-size:0.95rem; position:relative; overflow:hidden; }
 .quick-action-btn:hover { transform:translateY(-3px); box-shadow:0 8px 25px rgba(0,26,71,0.3); }
 .filter-input { border:1px solid rgba(0,26,71,0.2); color:var(--primary-color); background:#fff; }
 .filter-input:focus { border-color:var(--primary-color); box-shadow:0 0 0 0.2rem rgba(0,26,71,0.15); }
@@ -275,8 +405,8 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
 .filter-reset:focus,
 .filter-reset:active { border-color:var(--primary-color) !important; color:var(--primary-color) !important; background:#fff !important; box-shadow:0 0 0 0.2rem rgba(0,26,71,0.15) !important; }
 .filter-wrap { display:flex; justify-content:flex-end; }
-.filter-toggle { width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:12px; }
-.filter-menu { min-width:220px; padding:1rem; border:none; border-radius:16px; box-shadow:0 12px 32px rgba(0,0,0,0.12); background:#fff; }
+.filter-toggle { width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:8px; }
+.filter-menu { min-width:220px; padding:1rem; border:none; border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,0.12); background:#fff; }
 .filter-form { display:flex; flex-direction:column; gap:0.75rem; }
 .filter-options { display:flex; gap:0.5rem; }
 .filter-option { flex:1; border:1px solid rgba(0,26,71,0.2); background:#fff; color:var(--primary-color); border-radius:10px; padding:0.45rem 0.5rem; font-size:0.85rem; font-weight:500; }
@@ -287,8 +417,39 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
 .stats-grid{
     display:grid;
     grid-template-columns: repeat(5, 1fr);
-    gap:1.5rem;
-    margin-bottom:2rem;
+    gap:1rem;
+    margin-bottom:1.5rem;
+}
+.stats-grid .dashboard-card {
+    border-radius:10px;
+    padding:1rem;
+    margin-bottom:0;
+}
+.stats-grid .dashboard-card:hover {
+    transform:translateY(-4px);
+}
+.stats-grid .card-icon {
+    width:44px;
+    height:44px;
+    border-radius:8px;
+    margin-bottom:.75rem;
+    font-size:1.15rem;
+}
+.stats-grid .card-title {
+    margin-bottom:.35rem;
+    font-size:.88rem;
+    line-height:1.2;
+}
+.stats-grid .card-value {
+    font-size:1.55rem;
+    margin:.2rem 0 .75rem;
+    line-height:1;
+}
+.stats-grid .quick-action-btn {
+    border-radius:8px;
+    padding:.55rem .7rem;
+    margin-bottom:0;
+    font-size:.78rem;
 }
 .floating-shapes { position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none; overflow:hidden; z-index:0; }
 .shape { position:absolute; border-radius:50%; background: rgba(189, 187, 219, 0.14); animation: float 6s ease-in-out infinite; }
@@ -317,21 +478,22 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
     overflow:hidden;
     padding-bottom:8px;
     background:#fff;
-    border-radius:16px;
+    border-radius:10px;
 }
 
 .municipality-card{
     overflow:hidden;
+    padding:14px 16px 12px;
 }
 
 .municipality-chart-scroll{
     width:100%;
     overflow:hidden;
-    padding-bottom:6px;
+    padding-bottom:2px;
 }
 
 #municipalityChart{
-    min-height:250px;
+    min-height:180px;
     width:100% !important;
     display:block;
     background:#fff;
@@ -340,7 +502,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
 .blue-card{
     background: linear-gradient(135deg,#0d2f6b,#001a47);
     color:white;
-    border-radius:18px;
+    border-radius:10px;
     padding:22px;
     box-shadow:0 10px 25px rgba(0,0,0,.08);
 }
@@ -360,19 +522,20 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
 
 .dashboard-split{
     display:grid;
-    grid-template-columns:2fr 1fr;
+    grid-template-columns:1.7fr 1fr;
+    align-items:start;
     gap:1.5rem;
     margin-bottom:2rem;
 }
 
 #municipalityChart,
 #meetingChart{
-    height:250px !important;
+    height:180px !important;
 }
 
 .white-card{
     background:white;
-    border-radius:18px;
+    border-radius:10px;
     padding:20px;
     box-shadow:0 5px 20px rgba(0,0,0,.06);
 }
@@ -418,7 +581,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
 .leading-title-main i{
     width:36px;
     height:36px;
-    border-radius:12px;
+    border-radius:8px;
     display:flex;
     align-items:center;
     justify-content:center;
@@ -429,7 +592,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
 
 .leading-filter{
     width:110px;
-    border-radius:12px;
+    border-radius:8px;
     border:1px solid rgba(0, 26, 71, 0.12);
     box-shadow:none;
     font-size:13px;
@@ -443,7 +606,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
     gap:14px;
     margin-bottom:14px;
     padding:14px;
-    border-radius:18px;
+    border-radius:10px;
     background:rgba(255,255,255,0.88);
     border:1px solid rgba(226, 232, 240, 0.95);
     box-shadow:0 8px 22px rgba(15, 23, 42, 0.06);
@@ -553,6 +716,284 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
     color:#94a3b8;
 }
 
+.section-block{
+    margin-top:2rem;
+}
+
+.section-heading{
+    margin-bottom:1rem;
+}
+
+.section-heading h4{
+    margin:0;
+    color:var(--primary-color);
+    font-weight:700;
+    font-size:1.25rem;
+}
+
+.section-heading p{
+    margin:.25rem 0 0;
+    color:#6b7280;
+    font-size:.92rem;
+}
+
+.sheet-meta{
+    display:grid;
+    grid-template-columns:2fr 1fr;
+    gap:1rem;
+    margin-bottom:1rem;
+}
+
+.meta-strip,
+.summary-strip,
+.report-matrix,
+.mini-report,
+.narrative-card,
+.action-table-wrap{
+    border:1px solid rgba(0,26,71,.08);
+    border-radius:10px;
+    overflow:hidden;
+    background:#fff;
+}
+
+.meta-strip table,
+.summary-strip table,
+.report-matrix table,
+.mini-report table,
+.sheet-table table,
+.action-table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.meta-strip td,
+.summary-strip td,
+.report-matrix td,
+.report-matrix th,
+.mini-report td,
+.mini-report th,
+.sheet-table td,
+.sheet-table th,
+.action-table td,
+.action-table th{
+    border:1px solid rgba(15,23,42,.08);
+    padding:.55rem .7rem;
+    font-size:.84rem;
+    vertical-align:top;
+}
+
+.meta-strip td:first-child,
+.summary-strip td:first-child{
+    font-weight:600;
+    color:#334155;
+    width:34%;
+}
+
+.summary-strip td:first-child{
+    background:#123c73;
+    color:#fff;
+}
+
+.sheet-table{
+    border:1px solid rgba(0,26,71,.08);
+    border-radius:10px;
+    overflow:auto;
+    background:#fff;
+}
+
+.sheet-table table{
+    min-width:1320px;
+}
+
+.sheet-table thead th,
+.report-matrix thead th,
+.mini-report thead th,
+.action-table thead th{
+    background:linear-gradient(135deg,#123c73,#235f48);
+    color:#fff;
+    font-weight:600;
+    white-space:nowrap;
+}
+
+.sheet-table tbody tr:nth-child(even),
+.report-matrix tbody tr:nth-child(even),
+.mini-report tbody tr:nth-child(even),
+.action-table tbody tr:nth-child(even){
+    background:#f8fafc;
+}
+
+.sheet-table td{
+    white-space:nowrap;
+}
+
+.report-layout{
+    display:grid;
+    grid-template-columns:1fr;
+    align-items:start;
+    gap:1.5rem;
+    margin-top:1.5rem;
+}
+
+.report-matrix{
+    overflow:auto;
+}
+
+.report-matrix table{
+    min-width:1100px;
+}
+
+.report-matrix td,
+.report-matrix th{
+    font-size:.88rem;
+    padding:.6rem .75rem;
+    white-space:nowrap;
+}
+
+.report-matrix .total-row{
+    background:#e7f6eb;
+    font-weight:700;
+}
+
+.report-matrix .rating-row{
+    background:#f0faf2;
+}
+
+.mini-report-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:1rem;
+}
+
+.mini-report table{
+    table-layout:fixed;
+}
+
+.mini-report th,
+.mini-report td{
+    font-size:.88rem;
+    padding:.62rem .75rem;
+}
+
+.mini-report thead th{
+    white-space:normal;
+    line-height:1.25;
+}
+
+.mini-report th:first-child,
+.mini-report td:first-child{
+    width:58%;
+    white-space:normal;
+    word-break:break-word;
+    line-height:1.45;
+}
+
+.mini-report th:nth-child(2),
+.mini-report td:nth-child(2){
+    width:18%;
+    text-align:center;
+}
+
+.mini-report th:nth-child(3),
+.mini-report td:nth-child(3){
+    width:24%;
+    text-align:right;
+}
+
+.mini-report.green thead th{
+    background:linear-gradient(135deg,#20584a,#2d7c66);
+}
+
+.mini-report.blue thead th{
+    background:linear-gradient(135deg,#123c73,#1d5ea8);
+}
+
+.mini-report .total-cell{
+    font-weight:700;
+    background:#f8fafc;
+}
+
+.summary-panels{
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:1rem;
+    margin-bottom:1rem;
+}
+
+.summary-kpi{
+    background:linear-gradient(180deg,#ffffff 0%, #f8fbff 100%);
+    border:1px solid rgba(0,26,71,.08);
+    border-radius:10px;
+    padding:1rem;
+}
+
+.summary-kpi h5{
+    margin:0 0 .25rem;
+    font-size:.82rem;
+    color:#6b7280;
+    font-weight:600;
+}
+
+.summary-kpi strong{
+    font-size:1.4rem;
+    color:var(--primary-color);
+}
+
+.graphs-grid{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:1rem;
+}
+
+.dimension-grid{
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:1rem;
+}
+
+.graph-card{
+    background:#fff;
+    border:1px solid rgba(0,26,71,.08);
+    border-radius:10px;
+    padding:1rem;
+    min-height:300px;
+}
+
+.graph-card h6{
+    margin:0 0 .75rem;
+    color:var(--primary-color);
+    font-weight:700;
+    font-size:.95rem;
+}
+
+.graph-canvas{
+    position:relative;
+    height:220px;
+}
+
+.narrative-grid{
+    display:grid;
+    grid-template-columns:2fr 1fr;
+    gap:1rem;
+    margin-top:1.5rem;
+}
+
+.narrative-card{
+    padding:1rem;
+}
+
+.narrative-card h6{
+    margin:0 0 .75rem;
+    color:var(--primary-color);
+    font-weight:700;
+}
+
+.narrative-card p{
+    margin:0;
+    color:#334155;
+    line-height:1.7;
+    font-size:.92rem;
+}
+
 .counter{
     transition: all .4s ease;
 }
@@ -564,6 +1005,10 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
 
     .dashboard-split{
         grid-template-columns:1fr;
+    }
+
+    .dimension-grid{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -582,11 +1027,33 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
         gap:1rem;
     }
 
+    .sheet-meta,
+    .report-layout,
+    .narrative-grid,
+    .graphs-grid{
+        grid-template-columns:1fr;
+    }
+
+    .summary-panels,
+    .mini-report-grid,
+    .dimension-grid{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+
     .welcome-card,
-    .dashboard-card,
     .white-card{
-        border-radius:16px;
+        border-radius:10px;
         padding:1.25rem;
+    }
+
+    .dashboard-card{
+        border-radius:10px;
+        padding:1.25rem;
+    }
+
+    .stats-grid .dashboard-card{
+        border-radius:9px;
+        padding:.95rem;
     }
 
     .welcome-card .text-end{
@@ -615,6 +1082,12 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
         grid-template-columns:1fr;
     }
 
+    .summary-panels,
+    .mini-report-grid,
+    .dimension-grid{
+        grid-template-columns:1fr;
+    }
+
     .welcome-card h3{
         font-size:1.35rem;
     }
@@ -626,12 +1099,28 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
         font-size:1.45rem;
     }
 
+    .stats-grid .card-icon{
+        width:42px;
+        height:42px;
+        margin-bottom:.65rem;
+        font-size:1.05rem;
+    }
+
     .card-value{
         font-size:1.85rem;
     }
 
+    .stats-grid .card-value{
+        font-size:1.45rem;
+    }
+
     .quick-action-btn{
         padding:.85rem 1rem;
+    }
+
+    .stats-grid .quick-action-btn{
+        padding:.5rem .65rem;
+        font-size:.76rem;
     }
 
     .leading-title,
@@ -915,6 +1404,322 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
                 <canvas id="eventsChart"></canvas>
             </div>
         </div>
+
+        <div class="section-block">
+            <div class="section-heading">
+                <h4>Customer Satisfaction Dashboard</h4>
+                <p>Static dashboard preview for the customer satisfaction tabulation, report, and graph views.</p>
+            </div>
+
+            <div class="summary-panels">
+                <div class="summary-kpi">
+                    <h5>Total Responses</h5>
+                    <strong><?php echo $csfOverview['total_responses']; ?></strong>
+                </div>
+                <div class="summary-kpi">
+                    <h5>Total Clients</h5>
+                    <strong><?php echo $csfOverview['total_clients']; ?></strong>
+                </div>
+                <div class="summary-kpi">
+                    <h5>Retrieval Rate</h5>
+                    <strong><?php echo $csfOverview['retrieval_rate']; ?></strong>
+                </div>
+                <div class="summary-kpi">
+                    <h5>Overall Satisfaction</h5>
+                    <strong><?php echo $csfOverview['overall_satisfaction']; ?></strong>
+                </div>
+            </div>
+
+            <div class="sheet-meta">
+                <div class="meta-strip">
+                    <table>
+                        <tbody>
+                            <tr><td>Office</td><td><?php echo htmlspecialchars($csfOverview['office']); ?></td></tr>
+                            <tr><td>Process</td><td><?php echo htmlspecialchars($csfOverview['process']); ?></td></tr>
+                            <tr><td>Period</td><td><?php echo htmlspecialchars($csfOverview['period']); ?></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="summary-strip">
+                    <table>
+                        <tbody>
+                            <tr><td>Adjectival Rating</td><td><?php echo htmlspecialchars($csfOverview['adjectival_rating']); ?></td></tr>
+                            <tr><td>Responses Collected</td><td><?php echo $csfOverview['total_responses']; ?></td></tr>
+                            <tr><td>Target Clients</td><td><?php echo $csfOverview['total_clients']; ?></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="white-card mb-4">
+                <h6 class="card-title mb-3">Customer Satisfaction Feedback - Tabulation Sheet</h6>
+                <div class="sheet-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>No.</th>
+                                <th>Name/Codename</th>
+                                <th>Age Group</th>
+                                <th>Sex</th>
+                                <th>Client Type</th>
+                                <th>CC1</th>
+                                <th>CC2</th>
+                                <th>CC3</th>
+                                <th>Overall Rating/SQD 0</th>
+                                <th>Responsiveness</th>
+                                <th>Reliability</th>
+                                <th>Access and Facilities</th>
+                                <th>Communication</th>
+                                <th>Costs</th>
+                                <th>Integrity</th>
+                                <th>Assurance</th>
+                                <th>Outcome</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($tabulationRows as $row): ?>
+                                <tr>
+                                    <?php foreach ($row as $cell): ?>
+                                        <td><?php echo htmlspecialchars((string) $cell); ?></td>
+                                    <?php endforeach; ?>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="white-card mb-4">
+                <h6 class="card-title mb-3">Speaker Assessment Snapshot</h6>
+                <div class="sheet-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>No.</th>
+                                <th>Name/Codename</th>
+                                <th>Age Group</th>
+                                <th>Sex</th>
+                                <th>Client Type</th>
+                                <th>Speaker 1</th>
+                                <th>Speaker 2</th>
+                                <th>Speaker 3</th>
+                                <th>Speaker 4</th>
+                                <th>Speaker 5</th>
+                                <th>Speaker 6</th>
+                                <th>Speaker 7</th>
+                                <th>Speaker 8</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($speakerRows as $row): ?>
+                                <tr>
+                                    <?php foreach ($row as $cell): ?>
+                                        <td><?php echo htmlspecialchars((string) $cell); ?></td>
+                                    <?php endforeach; ?>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="report-layout">
+                <div class="report-matrix">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Level of Satisfaction</th>
+                                <th>Overall Scoring</th>
+                                <?php foreach ($dimensionSummaries as $dimension): ?>
+                                    <th><?php echo htmlspecialchars($dimension[0]); ?></th>
+                                <?php endforeach; ?>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Strongly Agree</td>
+                                <td>244</td>
+                                <td>10</td>
+                                <td>16</td>
+                                <td>30</td>
+                                <td>11</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>30</td>
+                                <td>0</td>
+                            </tr>
+                            <tr>
+                                <td>Agree</td>
+                                <td>77</td>
+                                <td>0</td>
+                                <td>5</td>
+                                <td>0</td>
+                                <td>18</td>
+                                <td>0</td>
+                                <td>24</td>
+                                <td>0</td>
+                                <td>30</td>
+                            </tr>
+                            <tr>
+                                <td>Neither Agree nor Disagree</td>
+                                <td>16</td>
+                                <td>0</td>
+                                <td>9</td>
+                                <td>1</td>
+                                <td>1</td>
+                                <td>0</td>
+                                <td>6</td>
+                                <td>0</td>
+                                <td>0</td>
+                            </tr>
+                            <tr>
+                                <td>Disagree</td>
+                                <td>1</td>
+                                <td>1</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0</td>
+                            </tr>
+                            <tr class="total-row">
+                                <td>Total</td>
+                                <td>338</td>
+                                <td>11</td>
+                                <td>30</td>
+                                <td>31</td>
+                                <td>30</td>
+                                <td>31</td>
+                                <td>30</td>
+                                <td>30</td>
+                                <td>30</td>
+                            </tr>
+                            <tr class="rating-row">
+                                <td>CSF Rating</td>
+                                <td><?php echo htmlspecialchars($csfOverview['overall_satisfaction']); ?></td>
+                                <?php foreach ($dimensionSummaries as $dimension): ?>
+                                    <td><?php echo htmlspecialchars($dimension[1]); ?></td>
+                                <?php endforeach; ?>
+                            </tr>
+                            <tr class="rating-row">
+                                <td>Adjectival Rating</td>
+                                <td><?php echo htmlspecialchars($csfOverview['adjectival_rating']); ?></td>
+                                <?php foreach ($dimensionSummaries as $dimension): ?>
+                                    <td><?php echo htmlspecialchars($dimension[2]); ?></td>
+                                <?php endforeach; ?>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mini-report-grid">
+                    <?php foreach ($csfTables as $table): ?>
+                        <div class="mini-report <?php echo htmlspecialchars($table['theme']); ?>">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th><?php echo htmlspecialchars($table['title']); ?></th>
+                                        <th># of Responses</th>
+                                        <th>% Distribution</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($table['rows'] as $row): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($row[0]); ?></td>
+                                            <td><?php echo htmlspecialchars((string) $row[1]); ?></td>
+                                            <td><?php echo htmlspecialchars((string) $row[2]); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    <?php if (isset($table['total'])): ?>
+                                        <tr class="total-cell">
+                                            <td>Total Responses</td>
+                                            <td><?php echo htmlspecialchars((string) $table['total'][0]); ?></td>
+                                            <td><?php echo htmlspecialchars((string) $table['total'][1]); ?></td>
+                                        </tr>
+                                    <?php endif; ?>
+                                    <?php if (isset($table['summary'])): ?>
+                                        <?php foreach ($table['summary'] as $summaryRow): ?>
+                                            <tr class="total-cell">
+                                                <td><?php echo htmlspecialchars($summaryRow[0]); ?></td>
+                                                <td colspan="2"><?php echo htmlspecialchars($summaryRow[1]); ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <?php if (($table['title'] ?? '') === 'Client Type'): ?>
+                            <div class="narrative-card">
+                                <h6>Descriptive Analysis</h6>
+                                <p>During the period of <?php echo htmlspecialchars($csfOverview['period']); ?>, a total of <?php echo $csfOverview['total_clients']; ?> clients received a Client Satisfaction Feedback form related to the <?php echo htmlspecialchars($csfOverview['process']); ?> process. The office successfully collected <?php echo $csfOverview['total_responses']; ?> forms, resulting in a retrieval efficiency of <?php echo htmlspecialchars($csfOverview['retrieval_rate']); ?>. The computed CSF rating is <?php echo htmlspecialchars($csfOverview['overall_satisfaction']); ?>, which corresponds to a <?php echo htmlspecialchars($csfOverview['adjectival_rating']); ?> level of client satisfaction. Based on the static profile shown below, business clients make up the largest segment, while the 20-34 age group accounts for the highest share of respondents.</p>
+                            </div>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div class="narrative-grid">
+                <div class="action-table-wrap">
+                    <table class="action-table">
+                        <thead>
+                            <tr>
+                                <th>Source of Improvement</th>
+                                <th>Improvement Action</th>
+                                <th>Responsibility</th>
+                                <th>Timeline</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Reliability</td><td>Review service turnaround checkpoints</td><td>Process Owner</td><td>Q2</td></tr>
+                            <tr><td>Integrity</td><td>Refresh transparency reminders for frontline staff</td><td>Admin Office</td><td>Q2</td></tr>
+                            <tr><td>Communication</td><td>Update public advisories and response scripts</td><td>Support Team</td><td>Q3</td></tr>
+                            <tr><td>Clients Comments</td><td>Create monthly improvement review meeting</td><td>Management</td><td>Monthly</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section-block">
+                <div class="section-heading">
+                    <h4>Demographic Profile</h4>
+                    <p>Static preview of the demographic charts from the spreadsheet graphs sheet.</p>
+                </div>
+                <div class="graphs-grid">
+                    <div class="graph-card">
+                        <h6>Sex Disaggregation</h6>
+                        <div class="graph-canvas"><canvas id="sexChart"></canvas></div>
+                    </div>
+                    <div class="graph-card">
+                        <h6>Age</h6>
+                        <div class="graph-canvas"><canvas id="ageChart"></canvas></div>
+                    </div>
+                    <div class="graph-card">
+                        <h6>Client Type</h6>
+                        <div class="graph-canvas"><canvas id="clientTypeChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-block">
+                <div class="section-heading">
+                    <h4>Service Quality Dimensions</h4>
+                    <p>Static donut charts for the service quality dimensions shown in the sample workbook.</p>
+                </div>
+                <div class="dimension-grid">
+                    <div class="graph-card"><h6>Responsiveness</h6><div class="graph-canvas"><canvas id="dimensionResponsiveness"></canvas></div></div>
+                    <div class="graph-card"><h6>Reliability</h6><div class="graph-canvas"><canvas id="dimensionReliability"></canvas></div></div>
+                    <div class="graph-card"><h6>Access & Facilities</h6><div class="graph-canvas"><canvas id="dimensionAccess"></canvas></div></div>
+                    <div class="graph-card"><h6>Communication</h6><div class="graph-canvas"><canvas id="dimensionCommunication"></canvas></div></div>
+                    <div class="graph-card"><h6>Costs</h6><div class="graph-canvas"><canvas id="dimensionCosts"></canvas></div></div>
+                    <div class="graph-card"><h6>Integrity</h6><div class="graph-canvas"><canvas id="dimensionIntegrity"></canvas></div></div>
+                    <div class="graph-card"><h6>Assurance</h6><div class="graph-canvas"><canvas id="dimensionAssurance"></canvas></div></div>
+                    <div class="graph-card"><h6>Outcome</h6><div class="graph-canvas"><canvas id="dimensionOutcome"></canvas></div></div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1175,6 +1980,98 @@ new Chart(document.getElementById('meetingChart'), {
         }
     }
 });
+
+const csfPalette = ['#2563eb', '#f97316', '#94a3b8', '#facc15', '#38bdf8'];
+
+function createStaticDoughnutChart(id, labels, data) {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+
+    new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                data,
+                backgroundColor: csfPalette,
+                borderColor: '#ffffff',
+                borderWidth: 2,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '56%',
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        boxWidth: 12,
+                        color: '#001a47',
+                        font: { size: 11 }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#001a47',
+                    titleColor: '#fff',
+                    bodyColor: '#fff'
+                }
+            }
+        }
+    });
+}
+
+function createStaticPieChart(id, labels, data) {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+
+    new Chart(canvas, {
+        type: 'pie',
+        data: {
+            labels,
+            datasets: [{
+                data,
+                backgroundColor: csfPalette,
+                borderColor: '#ffffff',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        boxWidth: 12,
+                        color: '#001a47',
+                        font: { size: 11 }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#001a47',
+                    titleColor: '#fff',
+                    bodyColor: '#fff'
+                }
+            }
+        }
+    });
+}
+
+createStaticPieChart('sexChart', ['Male', 'Female', 'Did not specify'], [17, 13, 1]);
+createStaticPieChart('ageChart', ['19 or lower', '20-34', '35-49', '50-64', '65 or higher'], [2, 13, 9, 6, 0]);
+createStaticPieChart('clientTypeChart', ['Citizen', 'Business', 'Government', 'Did not specify'], [6, 18, 6, 1]);
+
+const satisfactionLabels = ['Strongly Agree', 'Agree', 'Neither Agree nor Disagree', 'Disagree', 'Strongly Disagree'];
+createStaticDoughnutChart('dimensionResponsiveness', satisfactionLabels, [29, 0, 1, 1, 0]);
+createStaticDoughnutChart('dimensionReliability', satisfactionLabels, [16, 5, 9, 0, 0]);
+createStaticDoughnutChart('dimensionAccess', satisfactionLabels, [30, 0, 1, 0, 0]);
+createStaticDoughnutChart('dimensionCommunication', satisfactionLabels, [11, 18, 1, 0, 0]);
+createStaticDoughnutChart('dimensionCosts', satisfactionLabels, [0, 0, 0, 0, 31]);
+createStaticDoughnutChart('dimensionIntegrity', satisfactionLabels, [0, 24, 6, 0, 0]);
+createStaticDoughnutChart('dimensionAssurance', satisfactionLabels, [30, 0, 1, 0, 0]);
+createStaticDoughnutChart('dimensionOutcome', satisfactionLabels, [0, 30, 0, 0, 0]);
 </script>
 
 </body>

@@ -12,13 +12,26 @@ $dbname     = "nasugview2";
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) die("Connection failed: " . $conn->connect_error);
 
+function buildEventCode($eventId) {
+    return "EVT" . str_pad((string)$eventId, 4, "0", STR_PAD_LEFT);
+}
+
+function saveEventCode($conn, $eventId) {
+    $event_code = buildEventCode($eventId);
+    $stmt = $conn->prepare("UPDATE events SET event_code=? WHERE id=?");
+    $stmt->bind_param("si", $event_code, $eventId);
+    $stmt->execute();
+    $stmt->close();
+    return $event_code;
+}
+
 // ==============================
 // Initialize variables
 // ==============================
 $success = $error = "";
 
 // Business Owners form fields
-$title = $mode = $start_date = $end_date = $speaker = $budget = $address = $audience = $funding = $description = "";
+$title = $mode = $google_meet_link = $start_date = $end_date = $speaker = $budget = $address = $audience = $funding = $description = "";
 
 // Consumers form fields
 $c_title = $c_start_date = $c_end_date = $c_description = $c_address = "";
@@ -35,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // ==============================
         $title       = $conn->real_escape_string($_POST['title']);
         $mode        = $conn->real_escape_string($_POST['mode']);
+        $google_meet_link = $conn->real_escape_string(trim($_POST['google_meet_link'] ?? ''));
         $start_date  = $conn->real_escape_string($_POST['start_date']);
         $end_date    = $conn->real_escape_string($_POST['end_date']);
         $speaker     = $conn->real_escape_string($_POST['resource_speaker']);
@@ -44,7 +58,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $funding     = $conn->real_escape_string($_POST['funding']);
         $description = $conn->real_escape_string($_POST['description']);
 
-        if ($title && $mode && $start_date && $end_date) {
+        if ($title && $mode && $start_date && $end_date && ($mode !== 'Webinar' || $google_meet_link !== '')) {
+            if ($mode !== 'Webinar') {
+                $google_meet_link = '';
+            }
 
             $start_dt = new DateTime($start_date);
             $end_dt   = new DateTime($end_date);
@@ -65,18 +82,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt = $conn->prepare("
                 INSERT INTO events
-                (title, mode_of_delivery, start_date_and_time, end_date_and_time, speaker, budget, address, audience, funding_source, description, duration, status, remarks, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (event_code, title, mode_of_delivery, google_meet_link, start_date_and_time, end_date_and_time, speaker, budget, address, audience, funding_source, description, duration, status, remarks, created_at)
+                VALUES ('PENDING', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->bind_param(
-                "ssssssssssssss",
-                $title, $mode, $start_date, $end_date, $speaker, $budget,
+                "sssssssssssssss",
+                $title, $mode, $google_meet_link, $start_date, $end_date, $speaker, $budget,
                 $address, $audience, $funding, $description, $duration, $status, $remarks, $created_at
             );
 
             if ($stmt->execute()) {
+                saveEventCode($conn, $stmt->insert_id);
                 $success = "Event for Business Owners created successfully!";
-                $title = $mode = $start_date = $end_date = $speaker = $budget = $address = $audience = $funding = $description = "";
+                $title = $mode = $google_meet_link = $start_date = $end_date = $speaker = $budget = $address = $audience = $funding = $description = "";
             } else {
                 $error = "Error creating event: " . $stmt->error;
             }
@@ -98,14 +116,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($c_title && $c_start_date && $c_end_date) {
             $stmt = $conn->prepare("
                 INSERT INTO events
-                (title, start_date_and_time, end_date_and_time, address, description, duration, status, remarks, created_at)
-                VALUES (?, ?, ?, ?, ?, '', 'For Implementation', '', ?)
+                (event_code, title, start_date_and_time, end_date_and_time, address, description, duration, status, remarks, google_meet_link, created_at)
+                VALUES ('PENDING', ?, ?, ?, ?, ?, '', 'For Implementation', '', '', ?)
             ");
             $stmt->bind_param(
                 "ssssss",
                 $c_title, $c_start_date, $c_end_date, $c_address, $c_description, $created_at
             );
             if ($stmt->execute()) {
+                saveEventCode($conn, $stmt->insert_id);
                 $success = "Event for Consumers created successfully!";
                 $c_title = $c_start_date = $c_end_date = $c_description = $c_address = "";
             } else {
@@ -132,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <style>
 body { background-color: #f0f4ff; font-family: 'Poppins', sans-serif; padding: 30px 0; }
-.card { max-width: 950px; margin: 0 auto; padding: 2rem; border-radius: 18px; background: #fff; border-left: 7px solid #001a47; box-shadow: 0 8px 30px rgba(0,0,0,0.08); }
+.card { max-width: 950px; margin: 0 auto; padding: 2rem; border-radius: 10px; background: #fff; border-left: 7px solid #001a47; box-shadow: 0 8px 30px rgba(0,0,0,0.08); }
 .card h3 { color:#001a47; font-weight:700; margin-bottom:1.5rem; }
 .row.g-3 > div { margin-bottom:16px; }
 .form-control, .form-select, textarea { border-radius: 10px; border:1px solid #d6e4ff; box-shadow: 0 0 0 3px rgba(0,26,71,0.08); height:44px; padding: 8px 10px; }
@@ -160,7 +179,7 @@ textarea.form-control { height:120px; resize:none; }
 
     .card {
         padding:1.25rem;
-        border-radius:16px;
+        border-radius:10px;
     }
 
     .card h3 {
@@ -210,11 +229,15 @@ textarea.form-control { height:120px; resize:none; }
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Mode of Delivery <span class="text-danger">*</span></label>
-                        <select name="mode" class="form-select" required>
+                        <select name="mode" id="modeOfDelivery" class="form-select" required>
                             <option value="">Select Mode</option>
                             <option value="Seminar" <?php echo ($mode=="Seminar")?"selected":""; ?>>Seminar</option>
                             <option value="Webinar" <?php echo ($mode=="Webinar")?"selected":""; ?>>Webinar</option>
                         </select>
+                    </div>
+                    <div class="col-12" id="googleMeetLinkGroup" style="display:none;">
+                        <label class="form-label">Google Meet Link <span class="text-danger">*</span></label>
+                        <input type="url" name="google_meet_link" id="googleMeetLink" class="form-control" value="<?php echo htmlspecialchars($google_meet_link); ?>" placeholder="https://meet.google.com/xxx-xxxx-xxx">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Start Date & Time <span class="text-danger">*</span></label>
@@ -292,5 +315,20 @@ textarea.form-control { height:120px; resize:none; }
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const modeOfDelivery = document.getElementById('modeOfDelivery');
+const googleMeetLinkGroup = document.getElementById('googleMeetLinkGroup');
+const googleMeetLink = document.getElementById('googleMeetLink');
+
+function toggleGoogleMeetLink() {
+    const isWebinar = modeOfDelivery.value === 'Webinar';
+    googleMeetLinkGroup.style.display = isWebinar ? '' : 'none';
+    googleMeetLink.required = isWebinar;
+    if (!isWebinar) googleMeetLink.value = '';
+}
+
+modeOfDelivery.addEventListener('change', toggleGoogleMeetLink);
+toggleGoogleMeetLink();
+</script>
 </body>
 </html>

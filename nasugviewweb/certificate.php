@@ -82,6 +82,7 @@ foreach ($templateFiles as $file) {
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Great+Vibes&family=Montserrat:wght@400;500;600;700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{
     --navy:#001a47;
@@ -145,7 +146,7 @@ body.left-panel-hidden .main-content{
 .panel{
     background:rgba(255,255,255,.9);
     border:1px solid rgba(0,26,71,.08);
-    border-radius:20px;
+    border-radius:10px;
     box-shadow:var(--shadow);
     backdrop-filter:blur(10px);
 }
@@ -242,7 +243,7 @@ body.left-panel-hidden .main-content{
     justify-content:space-between;
     min-height:74px;
     padding:10px;
-    border-radius:14px;
+    border-radius:8px;
     background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
     border:1px solid rgba(0,26,71,.08);
     box-shadow:0 12px 24px rgba(0,26,71,.18);
@@ -301,6 +302,10 @@ body.left-panel-hidden .main-content{
     justify-content:flex-end;
 }
 
+.download-menu-wrap{
+    position:relative;
+}
+
 .action-btn{
     position:relative;
     display:inline-flex;
@@ -310,7 +315,7 @@ body.left-panel-hidden .main-content{
     min-width:44px;
     height:44px;
     padding:0 14px;
-    border-radius:14px;
+    border-radius:8px;
     font-size:13px;
     font-weight:600;
     background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
@@ -379,10 +384,57 @@ body.left-panel-hidden .main-content{
     color:#3a2b03;
 }
 
+.download-menu{
+    position:absolute;
+    right:0;
+    top:calc(100% + 8px);
+    min-width:180px;
+    padding:8px;
+    border-radius:8px;
+    border:1px solid rgba(0,26,71,.12);
+    background:rgba(255,255,255,.98);
+    box-shadow:0 18px 40px rgba(15,23,42,.18);
+    z-index:80;
+}
+
+.download-menu[hidden]{
+    display:none;
+}
+
+.download-option{
+    width:100%;
+    height:40px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:0 12px;
+    border:none;
+    border-radius:10px;
+    background:transparent;
+    color:var(--ink);
+    font:inherit;
+    font-size:12px;
+    font-weight:600;
+    text-align:left;
+    cursor:pointer;
+}
+
+.download-option i{
+    width:16px;
+    color:var(--navy-deep);
+}
+
+.download-option:hover,
+.download-option:focus-visible{
+    background:#eef3fa;
+    color:var(--navy);
+    outline:none;
+}
+
 .board-toolbar{
     margin:0 14px;
     padding:8px 10px;
-    border-radius:14px;
+    border-radius:8px;
     background:linear-gradient(180deg, #ffffff 0%, #eef3fa 100%);
     border:1px solid rgba(0,26,71,.08);
     display:flex;
@@ -428,7 +480,7 @@ body.left-panel-hidden .main-content{
     height:40px;
     padding:0 12px;
     border:1px solid var(--line);
-    border-radius:12px;
+    border-radius:8px;
     background:#fff;
     font:inherit;
     color:var(--ink);
@@ -447,7 +499,7 @@ body.left-panel-hidden .main-content{
 .board-stage{
     position:relative;
     padding:10px;
-    border-radius:20px;
+    border-radius:10px;
     background:
         linear-gradient(180deg, rgba(255,255,255,.94), rgba(238,243,250,.96)),
         repeating-linear-gradient(0deg, rgba(0,26,71,.04) 0, rgba(0,26,71,.04) 1px, transparent 1px, transparent 34px),
@@ -499,10 +551,56 @@ body.left-panel-hidden .main-content{
     min-height:30px;
     cursor:move;
     user-select:none;
+    touch-action:none;
+}
+
+.item-shape{
+    min-height:1px;
+}
+
+.item-shape.selected{
+    cursor:move;
+}
+
+.item-shape.selected::before{
+    content:"";
+    position:absolute;
+    inset:-6px;
+    border:1px solid rgba(21,66,111,.75);
+    pointer-events:none;
 }
 
 .design-item.selected{
     box-shadow:0 0 0 2px rgba(21,66,111,.4);
+}
+
+.design-item.locked{
+    cursor:not-allowed;
+}
+
+.design-item.locked::after{
+    content:"\f023";
+    position:absolute;
+    right:-10px;
+    top:-10px;
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--navy);
+    color:#fff;
+    font-family:"Font Awesome 6 Free";
+    font-size:10px;
+    font-weight:900;
+    box-shadow:0 8px 18px rgba(0,26,71,.25);
+    z-index:7;
+}
+
+.design-item.locked .resize-handle,
+.design-item.locked .rotate-handle{
+    display:none !important;
 }
 
 .item-content{
@@ -530,7 +628,32 @@ body.left-panel-hidden .main-content{
     display:block;
     width:100%;
     height:100%;
-    object-fit:cover;
+    object-fit:contain;
+    pointer-events:none;
+}
+
+.crop-overlay{
+    position:absolute;
+    inset:0;
+    display:none;
+    pointer-events:none;
+    border:2px solid rgba(21,66,111,.9);
+    box-shadow:0 0 0 1px rgba(255,255,255,.9);
+}
+
+.item-image.selected .crop-overlay{
+    display:block;
+}
+
+.item-image.selected{
+    cursor:move;
+}
+
+.item-image.selected::before{
+    content:"";
+    position:absolute;
+    inset:-6px;
+    border:1px solid rgba(21,66,111,.75);
     pointer-events:none;
 }
 
@@ -556,10 +679,85 @@ body.left-panel-hidden .main-content{
     display:flex;
 }
 
+.resize-handle{
+    position:absolute;
+    width:12px;
+    height:12px;
+    border:2px solid #fff;
+    border-radius:50%;
+    background:var(--navy);
+    box-shadow:0 6px 14px rgba(0,26,71,.28);
+    display:none;
+    z-index:5;
+}
+
+.design-item.selected .resize-handle{
+    display:block;
+}
+
+.resize-top{
+    top:-7px;
+    left:50%;
+    transform:translateX(-50%);
+    cursor:ns-resize;
+}
+
+.resize-right{
+    top:50%;
+    right:-7px;
+    transform:translateY(-50%);
+    cursor:ew-resize;
+}
+
+.resize-bottom{
+    bottom:-7px;
+    left:50%;
+    transform:translateX(-50%);
+    cursor:ns-resize;
+}
+
+.resize-left{
+    top:50%;
+    left:-7px;
+    transform:translateY(-50%);
+    cursor:ew-resize;
+}
+
+.resize-top.resize-left,
+.resize-top.resize-right,
+.resize-bottom.resize-left,
+.resize-bottom.resize-right{
+    transform:none;
+}
+
+.resize-top.resize-left{
+    top:-7px;
+    left:-7px;
+    cursor:nwse-resize;
+}
+
+.resize-top.resize-right{
+    top:-7px;
+    right:-7px;
+    cursor:nesw-resize;
+}
+
+.resize-bottom.resize-left{
+    bottom:-7px;
+    left:-7px;
+    cursor:nesw-resize;
+}
+
+.resize-bottom.resize-right{
+    right:-7px;
+    bottom:-7px;
+    cursor:nwse-resize;
+}
+
 .empty-state{
     padding:12px 14px;
     border:1px dashed rgba(0,26,71,.15);
-    border-radius:14px;
+    border-radius:8px;
     color:rgba(255,255,255,.88);
     background:linear-gradient(135deg, rgba(0,26,71,.92) 0%, rgba(0,48,138,.92) 100%);
     font-size:12px;
@@ -574,7 +772,7 @@ body.left-panel-hidden .main-content{
 .template-card{
     width:100%;
     padding:8px;
-    border-radius:14px;
+    border-radius:8px;
     background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
     border:1px solid rgba(0,26,71,.08);
     text-align:left;
@@ -727,7 +925,7 @@ body.left-panel-hidden .main-content{
 .footer-note{
     margin:14px 16px 0;
     padding:12px 14px;
-    border-radius:14px;
+    border-radius:8px;
     background:linear-gradient(180deg, rgba(212,175,55,.12), rgba(212,175,55,.04));
     color:#5e4a0a;
     font-size:12px;
@@ -750,7 +948,7 @@ body.left-panel-hidden .main-content{
     min-width:72px;
     height:36px;
     padding:0 12px;
-    border-radius:12px;
+    border-radius:8px;
     display:inline-flex;
     align-items:center;
     justify-content:center;
@@ -765,7 +963,7 @@ body.left-panel-hidden .main-content{
 .collapsible{
     margin-top:10px;
     border:1px solid rgba(0,26,71,.08);
-    border-radius:14px;
+    border-radius:8px;
     background:linear-gradient(180deg, rgba(255,255,255,.98) 0%, rgba(238,243,250,.95) 100%);
     overflow:hidden;
 }
@@ -828,7 +1026,7 @@ body.left-panel-hidden .main-content{
     height:42px;
     min-width:42px;
     border:none;
-    border-radius:12px;
+    border-radius:8px;
     background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
     color:#fff;
     display:inline-flex;
@@ -855,7 +1053,7 @@ body.left-panel-hidden .main-content{
     z-index:1200;
     display:none;
     box-shadow:0 12px 24px rgba(0,26,71,.12);
-    border-radius:12px;
+    border-radius:8px;
 }
 
 .panel-toggle-float::after{
@@ -899,7 +1097,7 @@ body.inspector-hidden .inspector-panel{
     position:fixed;
     min-width:220px;
     padding:8px;
-    border-radius:18px;
+    border-radius:10px;
     border:1px solid rgba(0,26,71,.12);
     background:rgba(255,255,255,.98);
     box-shadow:0 22px 55px rgba(15,23,42,.18);
@@ -928,7 +1126,7 @@ body.inspector-hidden .inspector-panel{
     gap:16px;
     padding:11px 12px;
     border:none;
-    border-radius:12px;
+    border-radius:8px;
     background:transparent;
     color:var(--ink);
     font:inherit;
@@ -1026,7 +1224,7 @@ body.exporting #canvas::before{
     .panel-toggle-float{
         top:18px;
         left:70px;
-        border-radius:12px;
+        border-radius:8px;
     }
 }
 
@@ -1036,7 +1234,7 @@ body.exporting #canvas::before{
     }
 
     .panel{
-        border-radius:14px;
+        border-radius:10px;
         box-shadow:0 12px 30px rgba(0,26,71,.10);
     }
 
@@ -1307,14 +1505,34 @@ body.exporting #canvas::before{
                         <i class="fas fa-trash" aria-hidden="true"></i>
                         <span class="btn-tooltip">Delete (Del)</span>
                     </button>
+                    <button class="action-btn icon-only" type="button" id="lockBtn" aria-label="Lock selected">
+                        <i class="fas fa-lock" aria-hidden="true"></i>
+                        <span class="btn-tooltip">Lock Selected</span>
+                    </button>
+                    <button class="action-btn icon-only" type="button" id="unlockBtn" aria-label="Unlock selected">
+                        <i class="fas fa-unlock" aria-hidden="true"></i>
+                        <span class="btn-tooltip">Unlock Selected</span>
+                    </button>
                     <button class="action-btn icon-only gold" type="button" id="saveBtn" aria-label="Save template">
                         <i class="fas fa-floppy-disk" aria-hidden="true"></i>
                         <span class="btn-tooltip">Save Template (Ctrl + S)</span>
                     </button>
-                    <button class="action-btn icon-only primary" type="button" id="downloadBtn" aria-label="Download PNG">
-                        <i class="fas fa-download" aria-hidden="true"></i>
-                        <span class="btn-tooltip">Download PNG</span>
-                    </button>
+                    <div class="download-menu-wrap">
+                        <button class="action-btn icon-only primary" type="button" id="downloadBtn" aria-label="Download" aria-expanded="false" aria-controls="downloadMenu">
+                            <i class="fas fa-download" aria-hidden="true"></i>
+                            <span class="btn-tooltip">Download</span>
+                        </button>
+                        <div class="download-menu" id="downloadMenu" hidden>
+                            <button class="download-option" type="button" data-download-format="pdf">
+                                <i class="fas fa-file-pdf" aria-hidden="true"></i>
+                                <span>Save as PDF</span>
+                            </button>
+                            <button class="download-option" type="button" data-download-format="png">
+                                <i class="fas fa-image" aria-hidden="true"></i>
+                                <span>Save as Image</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1370,7 +1588,7 @@ body.exporting #canvas::before{
                     </div>
                 </div>
             </div>
-            <div class="shortcut-note">Shortcuts: Ctrl + S save, Ctrl + Z undo, Ctrl + Y or Ctrl + Shift + Z redo, Ctrl + Plus zoom in, Ctrl + Minus zoom out, Delete remove, right-click any element for layer options.</div>
+            <div class="shortcut-note">Shortcuts: Ctrl + click multi-select, Ctrl + A select all, Ctrl + S save, Ctrl + Z undo, Ctrl + Y or Ctrl + Shift + Z redo, Ctrl + Plus zoom in, Ctrl + Minus zoom out, Delete remove, right-click any element for layer options.</div>
         </main>
 
         <aside class="panel inspector inspector-panel" id="inspectorPanel">
@@ -1463,6 +1681,23 @@ body.exporting #canvas::before{
                         <div class="field">
                             <button class="action-btn" type="button" id="replaceImageBtn">Replace Image</button>
                         </div>
+                        <div class="field">
+                            <label for="imageFit">Image Fit</label>
+                            <select id="imageFit">
+                                <option value="contain">Show Full Image</option>
+                                <option value="cover">Crop to Box</option>
+                            </select>
+                        </div>
+                        <div class="field two-col">
+                            <div>
+                                <label for="imageCropX">Crop X</label>
+                                <input type="range" id="imageCropX" min="0" max="100" step="1" value="50">
+                            </div>
+                            <div>
+                                <label for="imageCropY">Crop Y</label>
+                                <input type="range" id="imageCropY" min="0" max="100" step="1" value="50">
+                            </div>
+                        </div>
                     </div>
                 </details>
 
@@ -1500,7 +1735,7 @@ body.exporting #canvas::before{
                             </div>
                             <div>
                                 <label for="boxHeight">Height</label>
-                                <input type="number" id="boxHeight" min="20">
+                                <input type="number" id="boxHeight" min="2">
                             </div>
                         </div>
                     </div>
@@ -1539,6 +1774,9 @@ body.exporting #canvas::before{
     <button type="button" class="context-item" data-menu-action="send-backward">Send backward <span>Down</span></button>
     <button type="button" class="context-item" data-menu-action="send-back">Send to back <span>Bottom</span></button>
     <div class="context-divider"></div>
+    <button type="button" class="context-item" data-menu-action="lock">Lock selected <span>Lock</span></button>
+    <button type="button" class="context-item" data-menu-action="unlock">Unlock selected <span>Open</span></button>
+    <div class="context-divider"></div>
     <button type="button" class="context-item" data-menu-action="duplicate">Duplicate <span>Ctrl+D</span></button>
     <button type="button" class="context-item" data-menu-action="delete">Delete <span>Del</span></button>
 </div>
@@ -1569,6 +1807,9 @@ const fillColor = document.getElementById('fillColor');
 const borderColor = document.getElementById('borderColor');
 const borderWidth = document.getElementById('borderWidth');
 const cornerRadius = document.getElementById('cornerRadius');
+const imageFit = document.getElementById('imageFit');
+const imageCropX = document.getElementById('imageCropX');
+const imageCropY = document.getElementById('imageCropY');
 const opacityRange = document.getElementById('opacityRange');
 const opacityValue = document.getElementById('opacityValue');
 const rotationRange = document.getElementById('rotationRange');
@@ -1581,8 +1822,11 @@ const canvasColor = document.getElementById('canvasColor');
 const alignButtons = [...document.querySelectorAll('[data-align]')];
 const contextMenu = document.getElementById('contextMenu');
 const zoomValue = document.getElementById('zoomValue');
+const downloadBtn = document.getElementById('downloadBtn');
+const downloadMenu = document.getElementById('downloadMenu');
 
 let selectedItem = null;
+let selectedItems = new Set();
 let historyStack = [];
 let redoStack = [];
 let highestZ = 10;
@@ -1598,65 +1842,149 @@ const ZOOM_STEP = 0.1;
 const LEFT_PANEL_STORAGE_KEY = 'certificate_left_panel_hidden';
 
 const presets = {
+    logoDti: {
+        type: 'image',
+        x: 438,
+        y: 70,
+        width: 116,
+        height: 72,
+        rotation: 0,
+        zIndex: 18,
+        opacity: 1,
+        src: 'assets/dti-philippines.png',
+        html: '',
+        styles: {
+            backgroundColor: 'transparent',
+            borderRadius: '0px',
+            borderWidth: '0px',
+            borderColor: 'transparent',
+            objectFit: 'contain',
+            objectPosition: '50% 50%'
+        }
+    },
+    logoNegosyo: {
+        type: 'image',
+        x: 562,
+        y: 78,
+        width: 158,
+        height: 54,
+        rotation: 0,
+        zIndex: 18,
+        opacity: 1,
+        src: 'assets/negosyo-center.png',
+        html: '',
+        styles: {
+            backgroundColor: 'transparent',
+            borderRadius: '0px',
+            borderWidth: '0px',
+            borderColor: 'transparent',
+            objectFit: 'contain',
+            objectPosition: '50% 50%'
+        }
+    },
     title: {
         type: 'text',
-        x: 220,
-        y: 92,
-        width: 680,
-        height: 90,
+        x: 260,
+        y: 150,
+        width: 604,
+        height: 72,
         rotation: 0,
         zIndex: 20,
         opacity: 1,
-        html: 'Certificate of Appreciation',
+        html: 'CERTIFICATE',
         styles: {
             fontFamily: "'Cormorant Garamond', serif",
-            fontSize: '44px',
+            fontSize: '58px',
             fontWeight: '700',
-            color: '#001a47',
+            color: '#000000',
             textAlign: 'center',
             backgroundColor: 'transparent',
             borderRadius: '0px',
             borderWidth: '0px',
-            borderColor: '#001a47'
+            borderColor: '#000000'
+        }
+    },
+    subtitle: {
+        type: 'text',
+        x: 352,
+        y: 220,
+        width: 420,
+        height: 40,
+        rotation: 0,
+        zIndex: 20,
+        opacity: 1,
+        html: 'OF PARTICIPATION',
+        styles: {
+            fontFamily: "'Cormorant Garamond', serif",
+            fontSize: '28px',
+            fontWeight: '600',
+            color: '#000000',
+            textAlign: 'center',
+            backgroundColor: 'transparent',
+            borderRadius: '0px',
+            borderWidth: '0px',
+            borderColor: '#000000'
+        }
+    },
+    awardText: {
+        type: 'text',
+        x: 342,
+        y: 284,
+        width: 440,
+        height: 38,
+        rotation: 0,
+        zIndex: 20,
+        opacity: 1,
+        html: 'This certificate is awarded to',
+        styles: {
+            fontFamily: "'Cormorant Garamond', serif",
+            fontSize: '22px',
+            fontWeight: '600',
+            color: '#000000',
+            textAlign: 'center',
+            backgroundColor: 'transparent',
+            borderRadius: '0px',
+            borderWidth: '0px',
+            borderColor: '#000000'
         }
     },
     recipient: {
         type: 'text',
-        x: 250,
-        y: 270,
-        width: 620,
-        height: 88,
+        x: 322,
+        y: 326,
+        width: 480,
+        height: 62,
         rotation: 0,
         zIndex: 21,
         opacity: 1,
-        html: 'Juan Dela Cruz',
+        html: '&nbsp;',
         styles: {
-            fontFamily: "'Great Vibes', cursive",
-            fontSize: '52px',
-            fontWeight: '400',
-            color: '#c2971f',
+            fontFamily: "'Montserrat', sans-serif",
+            fontSize: '34px',
+            fontWeight: '500',
+            color: '#17356f',
             textAlign: 'center',
             backgroundColor: 'transparent',
             borderRadius: '0px',
             borderWidth: '0px',
-            borderColor: '#c2971f'
+            borderColor: '#17356f'
         }
     },
     body: {
         type: 'text',
-        x: 190,
-        y: 375,
-        width: 740,
-        height: 100,
+        x: 180,
+        y: 432,
+        width: 764,
+        height: 112,
         rotation: 0,
         zIndex: 22,
         opacity: 1,
-        html: 'This certificate is proudly presented for outstanding participation and valuable contribution to the program.',
+        html: 'for participating in the program/activity entitled "Program Title" held on Month Day, Year at Venue. This paragraph may be edited by the user to describe the purpose and details of the certificate.',
         styles: {
-            fontFamily: "'Poppins', sans-serif",
-            fontSize: '18px',
-            fontWeight: '400',
-            color: '#334155',
+            fontFamily: "'Cormorant Garamond', serif",
+            fontSize: '24px',
+            fontWeight: '600',
+            color: '#000000',
             textAlign: 'center',
             backgroundColor: 'transparent',
             borderRadius: '0px',
@@ -1666,24 +1994,68 @@ const presets = {
     },
     signature: {
         type: 'text',
-        x: 740,
-        y: 625,
-        width: 220,
-        height: 74,
+        x: 440,
+        y: 590,
+        width: 244,
+        height: 44,
         rotation: 0,
         zIndex: 23,
         opacity: 1,
-        html: 'Maria Santos<br><span style="font-size:14px;">Program Head</span>',
+        html: 'Signatory',
         styles: {
-            fontFamily: "'Poppins', sans-serif",
-            fontSize: '22px',
-            fontWeight: '600',
-            color: '#001a47',
+            fontFamily: "'Great Vibes', cursive",
+            fontSize: '30px',
+            fontWeight: '400',
+            color: '#000000',
             textAlign: 'center',
             backgroundColor: 'transparent',
             borderRadius: '0px',
             borderWidth: '0px',
-            borderColor: '#001a47'
+            borderColor: '#000000'
+        }
+    },
+    signatoryName: {
+        type: 'text',
+        x: 410,
+        y: 636,
+        width: 304,
+        height: 34,
+        rotation: 0,
+        zIndex: 23,
+        opacity: 1,
+        html: 'NAME OF SIGNATORY',
+        styles: {
+            fontFamily: "'Cormorant Garamond', serif",
+            fontSize: '20px',
+            fontWeight: '700',
+            color: '#000000',
+            textAlign: 'center',
+            backgroundColor: 'transparent',
+            borderRadius: '0px',
+            borderWidth: '0px',
+            borderColor: '#000000'
+        }
+    },
+    signatoryPosition: {
+        type: 'text',
+        x: 432,
+        y: 668,
+        width: 260,
+        height: 32,
+        rotation: 0,
+        zIndex: 23,
+        opacity: 1,
+        html: 'Position',
+        styles: {
+            fontFamily: "'Cormorant Garamond', serif",
+            fontSize: '16px',
+            fontWeight: '500',
+            color: '#000000',
+            textAlign: 'center',
+            backgroundColor: 'transparent',
+            borderRadius: '0px',
+            borderWidth: '0px',
+            borderColor: '#000000'
         }
     },
     rectangle: {
@@ -1722,37 +2094,55 @@ const presets = {
     },
     line: {
         type: 'shape',
-        x: 320,
-        y: 348,
+        x: 322,
+        y: 394,
         width: 480,
-        height: 4,
+        height: 1,
         rotation: 0,
         zIndex: 14,
         opacity: 1,
         html: '',
         styles: {
-            backgroundColor: '#d4af37',
+            backgroundColor: '#000000',
             borderRadius: '999px',
             borderWidth: '0px',
-            borderColor: '#d4af37'
+            borderColor: '#000000'
         }
     },
     border: {
         type: 'shape',
-        x: 26,
-        y: 26,
-        width: 1071,
-        height: 742,
+        x: 52,
+        y: 52,
+        width: 1019,
+        height: 690,
         rotation: 0,
-        zIndex: 1,
+        zIndex: 0,
         opacity: 1,
         html: '',
         lockedFill: true,
         styles: {
             backgroundColor: 'transparent',
             borderRadius: '0px',
-            borderWidth: '8px',
-            borderColor: '#d4af37'
+            borderWidth: '6px',
+            borderColor: '#f0c52e'
+        }
+    },
+    innerBorder: {
+        type: 'shape',
+        x: 66,
+        y: 66,
+        width: 991,
+        height: 662,
+        rotation: 0,
+        zIndex: 0,
+        opacity: 1,
+        html: '',
+        lockedFill: true,
+        styles: {
+            backgroundColor: 'transparent',
+            borderRadius: '0px',
+            borderWidth: '2px',
+            borderColor: '#17356f'
         }
     },
     image: {
@@ -1770,7 +2160,9 @@ const presets = {
             backgroundColor: 'transparent',
             borderRadius: '14px',
             borderWidth: '0px',
-            borderColor: '#001a47'
+            borderColor: '#001a47',
+            objectFit: 'contain',
+            objectPosition: '50% 50%'
         }
     }
 };
@@ -1797,6 +2189,46 @@ function getCanvasWidth() {
 
 function getCanvasHeight() {
     return BASE_CANVAS_HEIGHT;
+}
+
+function getMinimumItemHeight(item) {
+    return item?.dataset.type === 'shape' ? 2 : 20;
+}
+
+function getMaximumItemWidth(item) {
+    return item?.dataset.type === 'shape' ? getCanvasWidth() * 2 : getCanvasWidth();
+}
+
+function getMaximumItemHeight(item) {
+    return item?.dataset.type === 'shape' ? getCanvasHeight() * 2 : getCanvasHeight();
+}
+
+function clampItemLeft(item, left, width = item?.offsetWidth || 0) {
+    if (item?.dataset.type === 'shape') {
+        return clamp(left, -width, getCanvasWidth());
+    }
+
+    return clamp(left, 0, getCanvasWidth() - width);
+}
+
+function clampItemTop(item, top, height = item?.offsetHeight || 0) {
+    if (item?.dataset.type === 'shape') {
+        return clamp(top, -height, getCanvasHeight());
+    }
+
+    return clamp(top, 0, getCanvasHeight() - height);
+}
+
+function isLocked(item) {
+    return item?.dataset.locked === '1';
+}
+
+function getSelectedItems() {
+    return [...selectedItems].filter((item) => item.isConnected);
+}
+
+function getEditableSelection() {
+    return getSelectedItems().filter((item) => !isLocked(item));
 }
 
 function updateZoomBadge() {
@@ -1887,6 +2319,9 @@ function createItem(data, shouldSave = true) {
     item.dataset.type = data.type;
     item.dataset.rotation = data.rotation || 0;
     item.dataset.lockedFill = data.lockedFill ? '1' : '0';
+    const locked = data.locked === true || data.locked === '1';
+    item.dataset.locked = locked ? '1' : '0';
+    item.classList.toggle('locked', locked);
     item.style.left = `${data.x || 0}px`;
     item.style.top = `${data.y || 0}px`;
     item.style.width = `${data.width || 160}px`;
@@ -1900,8 +2335,11 @@ function createItem(data, shouldSave = true) {
 
     if (data.type === 'image') {
         const img = document.createElement('img');
-        img.src = data.src || 'assets/nasugviewlogoblue.png';
+        img.src = data.src || 'assets/negosyo-center.png';
         content.appendChild(img);
+        const cropOverlay = document.createElement('div');
+        cropOverlay.className = 'crop-overlay';
+        content.appendChild(cropOverlay);
     } else if (data.type === 'text') {
         content.innerHTML = data.html || 'Edit text';
     }
@@ -1912,6 +2350,21 @@ function createItem(data, shouldSave = true) {
     rotateHandle.className = 'rotate-handle';
     rotateHandle.innerHTML = '&#8635;';
     item.appendChild(rotateHandle);
+
+    [
+        'resize-top resize-left',
+        'resize-top',
+        'resize-top resize-right',
+        'resize-right',
+        'resize-bottom resize-right',
+        'resize-bottom',
+        'resize-bottom resize-left',
+        'resize-left'
+    ].forEach((classes) => {
+        const handle = document.createElement('div');
+        handle.className = `resize-handle ${classes}`;
+        item.appendChild(handle);
+    });
 
     canvas.appendChild(item);
     bindItem(item);
@@ -1980,11 +2433,16 @@ function applyStyles(item, styles) {
     }
 
     if (type === 'image') {
+        const img = content.querySelector('img');
         item.style.borderRadius = styles.borderRadius || '14px';
         item.style.overflow = 'hidden';
         content.style.borderRadius = 'inherit';
         item.style.border = `${styles.borderWidth || '0px'} solid ${styles.borderColor || 'transparent'}`;
         content.style.backgroundColor = 'transparent';
+        if (img) {
+            img.style.objectFit = styles.objectFit || 'contain';
+            img.style.objectPosition = styles.objectPosition || '50% 50%';
+        }
     } else {
         item.style.border = 'none';
     }
@@ -1998,17 +2456,35 @@ function bindItem(item) {
         if (event.target.closest('.rotate-handle')) {
             return;
         }
-        selectItem(item);
+
+        const additiveSelection = event.ctrlKey || event.metaKey || event.shiftKey;
+        if (!additiveSelection && selectedItems.size > 1 && selectedItems.has(item)) {
+            selectedItem = item;
+            refreshSelectionState();
+            return;
+        }
+
+        selectItem(item, additiveSelection);
     });
 
     item.addEventListener('contextmenu', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        selectItem(item);
+        if (!selectedItems.has(item)) {
+            selectItem(item);
+        }
         openContextMenu(event.clientX, event.clientY);
     });
 
     item.addEventListener('dblclick', () => {
+        if (item.dataset.type === 'image') {
+            selectItem(item);
+            imageFit.value = 'cover';
+            updateSelectedStyles();
+            saveHistory();
+            return;
+        }
+
         if (item.dataset.type !== 'text') {
             return;
         }
@@ -2035,13 +2511,25 @@ function bindItem(item) {
 
     interact(item)
         .draggable({
-            ignoreFrom: '[contenteditable="true"], .rotate-handle',
+            ignoreFrom: '[contenteditable="true"], .rotate-handle, .resize-handle',
             listeners: {
                 move(event) {
-                    const left = snap(parseFloat(item.style.left || 0) + (event.dx / currentCanvasScale));
-                    const top = snap(parseFloat(item.style.top || 0) + (event.dy / currentCanvasScale));
-                    item.style.left = `${clamp(left, 0, getCanvasWidth() - item.offsetWidth)}px`;
-                    item.style.top = `${clamp(top, 0, getCanvasHeight() - item.offsetHeight)}px`;
+                    if (isLocked(item)) {
+                        return;
+                    }
+
+                    const targets = selectedItems.has(item) && selectedItems.size > 1
+                        ? getEditableSelection()
+                        : [item];
+                    const dx = event.dx / currentCanvasScale;
+                    const dy = event.dy / currentCanvasScale;
+
+                    targets.forEach((target) => {
+                        const left = snap(parseFloat(target.style.left || 0) + dx);
+                        const top = snap(parseFloat(target.style.top || 0) + dy);
+                        target.style.left = `${clampItemLeft(target, left)}px`;
+                        target.style.top = `${clampItemTop(target, top)}px`;
+                    });
                     syncInspector();
                 },
                 end() {
@@ -2050,19 +2538,30 @@ function bindItem(item) {
             }
         })
         .resizable({
-            edges: { left: true, right: true, bottom: true, top: true },
+            edges: {
+                left: '.resize-left',
+                right: '.resize-right',
+                bottom: '.resize-bottom',
+                top: '.resize-top'
+            },
+            margin: 14,
             listeners: {
                 move(event) {
-                    let width = clamp(event.rect.width / currentCanvasScale, 30, getCanvasWidth());
-                    let height = clamp(event.rect.height / currentCanvasScale, 20, getCanvasHeight());
+                    if (isLocked(item)) {
+                        return;
+                    }
+
+                    let width = clamp(event.rect.width / currentCanvasScale, 30, getMaximumItemWidth(item));
+                    const minHeight = getMinimumItemHeight(item);
+                    let height = clamp(event.rect.height / currentCanvasScale, minHeight, getMaximumItemHeight(item));
                     let left = snap(parseFloat(item.style.left || 0) + (event.deltaRect.left / currentCanvasScale));
                     let top = snap(parseFloat(item.style.top || 0) + (event.deltaRect.top / currentCanvasScale));
 
-                    left = clamp(left, 0, getCanvasWidth() - width);
-                    top = clamp(top, 0, getCanvasHeight() - height);
+                    left = clampItemLeft(item, left, width);
+                    top = clampItemTop(item, top, height);
 
                     item.style.width = `${snap(width)}px`;
-                    item.style.height = `${snap(height)}px`;
+                    item.style.height = `${height <= 10 ? Math.round(height) : snap(height)}px`;
                     item.style.left = `${left}px`;
                     item.style.top = `${top}px`;
                     syncInspector();
@@ -2073,7 +2572,7 @@ function bindItem(item) {
             },
             modifiers: [
                 interact.modifiers.restrictSize({
-                    min: { width: 30, height: 20 }
+                    min: { width: 30, height: 2 }
                 })
             ]
         });
@@ -2081,6 +2580,10 @@ function bindItem(item) {
     let rotating = false;
 
     rotateHandle.addEventListener('mousedown', (event) => {
+        if (isLocked(item)) {
+            return;
+        }
+
         event.stopPropagation();
         selectItem(item);
         rotating = true;
@@ -2114,7 +2617,7 @@ function setRotation(item, angle) {
 
 function openContextMenu(x, y) {
     const menuWidth = 220;
-    const menuHeight = 260;
+    const menuHeight = 340;
     const maxX = window.innerWidth - menuWidth - 16;
     const maxY = window.innerHeight - menuHeight - 16;
     contextMenu.style.left = `${Math.max(12, Math.min(x, maxX))}px`;
@@ -2126,14 +2629,22 @@ function closeContextMenu() {
     contextMenu.classList.remove('open');
 }
 
-function selectItem(item) {
-    document.querySelectorAll('.design-item.selected').forEach((node) => node.classList.remove('selected'));
-    selectedItem = item;
+function refreshSelectionState() {
+    selectedItems = new Set(getSelectedItems());
+    document.querySelectorAll('.design-item.selected').forEach((node) => {
+        if (!selectedItems.has(node)) {
+            node.classList.remove('selected');
+        }
+    });
+    selectedItems.forEach((node) => node.classList.add('selected'));
+
+    selectedItem = selectedItems.has(selectedItem) ? selectedItem : (getSelectedItems()[0] || null);
 
     if (selectedItem) {
         setInspectorHidden(false);
-        selectedItem.classList.add('selected');
-        selectionLabel.textContent = getSelectionName(selectedItem);
+        selectionLabel.textContent = selectedItems.size > 1
+            ? `${selectedItems.size} elements selected`
+            : `${getSelectionName(selectedItem)}${isLocked(selectedItem) ? ' (Locked)' : ''}`;
         inspectorEmpty.classList.add('hidden');
         inspectorFields.classList.remove('hidden');
         syncInspector();
@@ -2145,17 +2656,42 @@ function selectItem(item) {
     }
 }
 
-function clearSelection() {
-    if (selectedItem) {
-        selectedItem.classList.remove('selected');
+function selectItem(item, additive = false) {
+    if (!item) {
+        selectedItems.clear();
+        selectedItem = null;
+        refreshSelectionState();
+        return;
     }
+
+    if (additive) {
+        selectedItems.add(item);
+        selectedItem = item;
+    } else {
+        selectedItems.clear();
+        selectedItems.add(item);
+        selectedItem = item;
+    }
+
+    refreshSelectionState();
+}
+
+function selectAllItems() {
+    selectedItems = new Set(canvas.querySelectorAll('.design-item'));
+    selectedItem = getSelectedItems()[0] || null;
+    refreshSelectionState();
+}
+
+function clearSelection() {
+    selectedItems.clear();
     selectedItem = null;
     closeContextMenu();
-    selectItem(null);
+    refreshSelectionState();
 }
 
 function getItemStyles(item) {
     const content = item.querySelector('.item-content');
+    const img = content.querySelector('img');
     return {
         fontFamily: content.style.fontFamily || '',
         fontSize: content.style.fontSize || '',
@@ -2169,7 +2705,9 @@ function getItemStyles(item) {
             : (content.style.borderWidth || '0px'),
         borderColor: item.dataset.type === 'image'
             ? (item.style.borderColor || 'transparent')
-            : (content.style.borderColor || 'transparent')
+            : (content.style.borderColor || 'transparent'),
+        objectFit: item.dataset.type === 'image' ? (img?.style.objectFit || 'contain') : '',
+        objectPosition: item.dataset.type === 'image' ? (img?.style.objectPosition || '50% 50%') : ''
     };
 }
 
@@ -2192,6 +2730,7 @@ function serializeLayout() {
                 zIndex: Number(item.style.zIndex || 1),
                 opacity: parseFloat(item.style.opacity || 1),
                 lockedFill: item.dataset.lockedFill === '1',
+                locked: item.dataset.locked === '1',
                 styles: getItemStyles(item)
             };
 
@@ -2284,10 +2823,11 @@ function duplicateSelected() {
 }
 
 function deleteSelected() {
-    if (!selectedItem) {
+    const targets = getSelectedItems();
+    if (!targets.length) {
         return;
     }
-    selectedItem.remove();
+    targets.forEach((item) => item.remove());
     clearSelection();
     saveHistory();
 }
@@ -2326,6 +2866,10 @@ function syncInspector() {
         borderColor.value = toHexColor(styles.borderColor || '#001a47');
         borderWidth.value = parseInt(styles.borderWidth, 10) || 0;
         cornerRadius.value = parseInt(styles.borderRadius, 10) || 14;
+        const cropPosition = parseObjectPosition(styles.objectPosition);
+        imageFit.value = styles.objectFit || 'contain';
+        imageCropX.value = cropPosition.x;
+        imageCropY.value = cropPosition.y;
     }
 
     if (type === 'text') {
@@ -2346,6 +2890,14 @@ function toHexColor(value) {
     const input = document.createElement('canvas').getContext('2d');
     input.fillStyle = value || '#000000';
     return input.fillStyle;
+}
+
+function parseObjectPosition(value) {
+    const parts = String(value || '50% 50%').match(/(\d+(?:\.\d+)?)%/g) || ['50%', '50%'];
+    return {
+        x: parseFloat(parts[0]) || 50,
+        y: parseFloat(parts[1] || parts[0]) || 50
+    };
 }
 
 function updateSelectedText() {
@@ -2379,46 +2931,82 @@ function updateSelectedStyles() {
     }
 
     if (type === 'image') {
+        const img = content.querySelector('img');
         selectedItem.style.border = `${borderWidth.value}px solid ${borderColor.value}`;
         selectedItem.style.borderRadius = `${cornerRadius.value}px`;
+        if (img) {
+            img.style.objectFit = imageFit.value;
+            img.style.objectPosition = `${imageCropX.value}% ${imageCropY.value}%`;
+        }
     }
 
     selectedItem.style.opacity = opacityRange.value;
-    setRotation(selectedItem, rotationRange.value);
-    selectedItem.style.left = `${clamp(Number(posX.value || 0), 0, getCanvasWidth() - selectedItem.offsetWidth)}px`;
-    selectedItem.style.top = `${clamp(Number(posY.value || 0), 0, getCanvasHeight() - selectedItem.offsetHeight)}px`;
-    selectedItem.style.width = `${clamp(Number(boxWidth.value || 50), 30, getCanvasWidth())}px`;
-    selectedItem.style.height = `${clamp(Number(boxHeight.value || 20), 20, getCanvasHeight())}px`;
+    if (!isLocked(selectedItem)) {
+        setRotation(selectedItem, rotationRange.value);
+        const width = clamp(Number(boxWidth.value || 50), 30, getMaximumItemWidth(selectedItem));
+        const height = clamp(Number(boxHeight.value || getMinimumItemHeight(selectedItem)), getMinimumItemHeight(selectedItem), getMaximumItemHeight(selectedItem));
+        selectedItem.style.width = `${width}px`;
+        selectedItem.style.height = `${height}px`;
+        selectedItem.style.left = `${clampItemLeft(selectedItem, Number(posX.value || 0), width)}px`;
+        selectedItem.style.top = `${clampItemTop(selectedItem, Number(posY.value || 0), height)}px`;
+    }
     opacityValue.textContent = Number(opacityRange.value).toFixed(2);
     rotationValue.textContent = `${rotationRange.value} deg`;
 }
 
 function bringToFront() {
-    if (!selectedItem) return;
-    selectedItem.style.zIndex = ++highestZ;
+    const targets = getSelectedItems();
+    if (!targets.length) return;
+    targets.forEach((item) => {
+        item.style.zIndex = ++highestZ;
+    });
     closeContextMenu();
     saveHistory();
 }
 
 function bringForward() {
-    if (!selectedItem) return;
-    selectedItem.style.zIndex = Number(selectedItem.style.zIndex || 1) + 1;
-    highestZ = Math.max(highestZ, Number(selectedItem.style.zIndex));
+    const targets = getSelectedItems();
+    if (!targets.length) return;
+    targets.forEach((item) => {
+        item.style.zIndex = Number(item.style.zIndex || 1) + 1;
+        highestZ = Math.max(highestZ, Number(item.style.zIndex));
+    });
     closeContextMenu();
     saveHistory();
 }
 
 function sendBackward() {
-    if (!selectedItem) return;
-    selectedItem.style.zIndex = Math.max(1, Number(selectedItem.style.zIndex || 1) - 1);
+    const targets = getSelectedItems();
+    if (!targets.length) return;
+    targets.forEach((item) => {
+        item.style.zIndex = Math.max(1, Number(item.style.zIndex || 1) - 1);
+    });
     closeContextMenu();
     saveHistory();
 }
 
 function sendToBack() {
-    if (!selectedItem) return;
-    selectedItem.style.zIndex = 1;
+    const targets = getSelectedItems();
+    if (!targets.length) return;
+    targets.forEach((item) => {
+        item.style.zIndex = 1;
+    });
     closeContextMenu();
+    saveHistory();
+}
+
+function setSelectedLocked(locked) {
+    const targets = getSelectedItems();
+    if (!targets.length) {
+        return;
+    }
+
+    targets.forEach((item) => {
+        item.dataset.locked = locked ? '1' : '0';
+        item.classList.toggle('locked', locked);
+    });
+    closeContextMenu();
+    refreshSelectionState();
     saveHistory();
 }
 
@@ -2454,15 +3042,65 @@ function saveTemplate() {
       .finally(() => document.body.classList.remove('exporting'));
 }
 
-function downloadPNG() {
+function getExportFilename(extension) {
+    const baseName = templateNameInput.value.trim()
+        .replace(/[^a-zA-Z0-9_-]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'certificate-design';
+
+    return `${baseName}.${extension}`;
+}
+
+function renderCanvasForExport() {
     document.body.classList.add('exporting');
 
-    html2canvas(canvas, { backgroundColor: null }).then((result) => {
+    return html2canvas(canvas, {
+        backgroundColor: null,
+        scale: 2
+    }).finally(() => document.body.classList.remove('exporting'));
+}
+
+function downloadPNG() {
+    renderCanvasForExport().then((result) => {
         const link = document.createElement('a');
         link.href = result.toDataURL('image/png');
-        link.download = 'certificate-design.png';
+        link.download = getExportFilename('png');
         link.click();
-    }).finally(() => document.body.classList.remove('exporting'));
+    });
+}
+
+function downloadPDF() {
+    if (!window.jspdf?.jsPDF) {
+        alert('PDF export is still loading. Please try again in a moment.');
+        return;
+    }
+
+    renderCanvasForExport().then((result) => {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({
+            orientation: 'landscape',
+            unit: 'px',
+            format: [BASE_CANVAS_WIDTH, BASE_CANVAS_HEIGHT]
+        });
+
+        pdf.addImage(
+            result.toDataURL('image/png'),
+            'PNG',
+            0,
+            0,
+            BASE_CANVAS_WIDTH,
+            BASE_CANVAS_HEIGHT
+        );
+        pdf.save(getExportFilename('pdf'));
+    });
+}
+
+function setDownloadMenuOpen(open) {
+    downloadMenu.hidden = !open;
+    downloadBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function toggleDownloadMenu() {
+    setDownloadMenuOpen(downloadMenu.hidden);
 }
 
 function loadTemplate(name) {
@@ -2483,8 +3121,26 @@ document.getElementById('undoBtn').addEventListener('click', undo);
 document.getElementById('redoBtn').addEventListener('click', redo);
 document.getElementById('duplicateBtn').addEventListener('click', duplicateSelected);
 document.getElementById('deleteBtn').addEventListener('click', deleteSelected);
+document.getElementById('lockBtn').addEventListener('click', () => setSelectedLocked(true));
+document.getElementById('unlockBtn').addEventListener('click', () => setSelectedLocked(false));
 document.getElementById('saveBtn').addEventListener('click', saveTemplate);
-document.getElementById('downloadBtn').addEventListener('click', downloadPNG);
+downloadBtn.addEventListener('click', toggleDownloadMenu);
+downloadMenu.addEventListener('click', (event) => {
+    const format = event.target.closest('[data-download-format]')?.dataset.downloadFormat;
+    if (!format) {
+        return;
+    }
+
+    setDownloadMenuOpen(false);
+
+    if (format === 'pdf') {
+        downloadPDF();
+    }
+
+    if (format === 'png') {
+        downloadPNG();
+    }
+});
 document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
 document.getElementById('zoomOutBtn').addEventListener('click', zoomOut);
 document.getElementById('zoomFitBtn').addEventListener('click', zoomToFit);
@@ -2503,6 +3159,8 @@ contextMenu.addEventListener('click', (event) => {
     if (action === 'bring-forward') bringForward();
     if (action === 'send-backward') sendBackward();
     if (action === 'send-back') sendToBack();
+    if (action === 'lock') setSelectedLocked(true);
+    if (action === 'unlock') setSelectedLocked(false);
     if (action === 'duplicate') duplicateSelected();
     if (action === 'delete') deleteSelected();
 });
@@ -2545,6 +3203,10 @@ canvas.addEventListener('contextmenu', (event) => {
 document.addEventListener('mousedown', (event) => {
     if (!event.target.closest('#contextMenu') && !event.target.closest('.design-item')) {
         closeContextMenu();
+    }
+
+    if (!event.target.closest('.download-menu-wrap')) {
+        setDownloadMenuOpen(false);
     }
 });
 
@@ -2620,6 +3282,11 @@ borderWidth.addEventListener('input', updateSelectedStyles);
 borderWidth.addEventListener('change', saveHistory);
 cornerRadius.addEventListener('input', updateSelectedStyles);
 cornerRadius.addEventListener('change', saveHistory);
+imageFit.addEventListener('change', () => { updateSelectedStyles(); saveHistory(); });
+imageCropX.addEventListener('input', updateSelectedStyles);
+imageCropX.addEventListener('change', saveHistory);
+imageCropY.addEventListener('input', updateSelectedStyles);
+imageCropY.addEventListener('change', saveHistory);
 opacityRange.addEventListener('input', updateSelectedStyles);
 opacityRange.addEventListener('change', saveHistory);
 rotationRange.addEventListener('input', updateSelectedStyles);
@@ -2648,9 +3315,20 @@ document.addEventListener('keydown', (event) => {
     const activeTag = document.activeElement?.tagName;
     const editingField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag) || document.activeElement?.isContentEditable;
 
+    if (event.key === 'Escape' && !downloadMenu.hidden) {
+        setDownloadMenuOpen(false);
+        return;
+    }
+
     if (event.ctrlKey && event.key.toLowerCase() === 's') {
         event.preventDefault();
         saveTemplate();
+        return;
+    }
+
+    if (event.ctrlKey && event.key.toLowerCase() === 'a' && !editingField) {
+        event.preventDefault();
+        selectAllItems();
         return;
     }
 
@@ -2710,32 +3388,41 @@ document.addEventListener('keydown', (event) => {
         return;
     }
 
+    const moveTargets = getEditableSelection();
+    if (!moveTargets.length) {
+        return;
+    }
+
     const step = event.shiftKey ? 10 : 1;
     let moved = false;
-    let left = parseInt(selectedItem.style.left || 0, 10);
-    let top = parseInt(selectedItem.style.top || 0, 10);
+    let dx = 0;
+    let dy = 0;
 
     if (event.key === 'ArrowLeft') {
-        left -= step;
+        dx = -step;
         moved = true;
     }
     if (event.key === 'ArrowRight') {
-        left += step;
+        dx = step;
         moved = true;
     }
     if (event.key === 'ArrowUp') {
-        top -= step;
+        dy = -step;
         moved = true;
     }
     if (event.key === 'ArrowDown') {
-        top += step;
+        dy = step;
         moved = true;
     }
 
     if (moved) {
         event.preventDefault();
-        selectedItem.style.left = `${clamp(left, 0, getCanvasWidth() - selectedItem.offsetWidth)}px`;
-        selectedItem.style.top = `${clamp(top, 0, getCanvasHeight() - selectedItem.offsetHeight)}px`;
+        moveTargets.forEach((item) => {
+            const left = parseInt(item.style.left || 0, 10) + dx;
+            const top = parseInt(item.style.top || 0, 10) + dy;
+            item.style.left = `${clampItemLeft(item, left)}px`;
+            item.style.top = `${clampItemTop(item, top)}px`;
+        });
         syncInspector();
         saveHistory();
     }
@@ -2743,26 +3430,34 @@ document.addEventListener('keydown', (event) => {
 
 restoreLayout({
     board: {
-        backgroundColor: '#fffdf8',
+        backgroundColor: '#ffffff',
         backgroundImage: ''
     },
     elements: [
         deepClone(presets.border),
+        deepClone(presets.innerBorder),
+        deepClone(presets.logoDti),
+        deepClone(presets.logoNegosyo),
         deepClone(presets.title),
+        deepClone(presets.subtitle),
+        deepClone(presets.awardText),
         deepClone(presets.recipient),
         deepClone(presets.body),
         deepClone(presets.signature),
+        deepClone(presets.signatoryName),
+        deepClone(presets.signatoryPosition),
         {
             ...deepClone(presets.line),
-            y: 246,
-            width: 220,
-            x: 452
-        },
-        {
-            ...deepClone(presets.line),
-            y: 590,
-            width: 220,
-            x: 742
+            x: 270,
+            y: 390,
+            width: 584,
+            height: 1,
+            zIndex: 16,
+            styles: {
+                ...deepClone(presets.line).styles,
+                backgroundColor: '#000000',
+                borderColor: '#000000'
+            }
         }
     ]
 }, false);

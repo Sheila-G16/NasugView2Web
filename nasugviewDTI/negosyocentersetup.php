@@ -74,7 +74,7 @@ body{
 }
 
 .card{
-    border-radius:18px;
+    border-radius:10px;
     padding:2rem;
     background:#fff;
     border-left:6px solid #001a47;
@@ -166,7 +166,7 @@ body{
 @media (max-width:768px){
     .card{
         padding:1.25rem;
-        border-radius:16px;
+        border-radius:10px;
     }
 
     .row.mb-4{
@@ -199,7 +199,7 @@ body{
     #centerTable tr{
         margin-bottom:1rem;
         border:1px solid #e5e7eb;
-        border-radius:14px;
+        border-radius:8px;
         overflow:hidden;
         background:#fff;
     }
