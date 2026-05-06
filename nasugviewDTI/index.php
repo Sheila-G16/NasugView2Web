@@ -129,7 +129,7 @@ $conn->close();
 /* ======= BASE ======= */
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Montserrat',sans-serif;}
 body{background:linear-gradient(to right,#FFFFF0,#f0e6d2);display:flex;justify-content:center;align-items:center;height:100vh;}
-.container{width:720px;max-width:95%;min-height:520px;background:#fff;border-radius:30px;overflow:hidden;position:relative;box-shadow:0 20px 50px rgba(0,15,46,0.7),0 10px 30px rgba(0,15,46,0.5);}
+.container{width:720px;max-width:95%;min-height:520px;background:#fff;border-radius:10px;overflow:hidden;position:relative;box-shadow:0 20px 50px rgba(0,15,46,0.7),0 10px 30px rgba(0,15,46,0.5);}
 
 /* ======= FORM AREAS ======= */
 .form-container{position:absolute;top:0;height:100%;width:50%;display:flex;flex-direction:column;background:var(--secondary-color);transition:all .6s ease-in-out;}
@@ -181,7 +181,7 @@ button:hover{background:#001a47;}
         width:100%;
         max-width:430px;
         min-height:0;
-        border-radius:20px;
+        border-radius:10px;
     }
 
     .toggle-container{

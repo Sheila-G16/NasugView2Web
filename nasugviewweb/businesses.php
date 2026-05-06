@@ -95,7 +95,7 @@ body {
 
 .users-table-container{
     background:white;
-    border-radius:20px;
+    border-radius:10px;
     padding:2rem;
     box-shadow:0 5px 25px rgba(0,0,0,0.08);
 }
@@ -150,7 +150,7 @@ body {
 
     .users-table-container{
         padding:1.25rem;
-        border-radius:16px;
+        border-radius:10px;
     }
 
     .table-responsive{
@@ -172,7 +172,7 @@ body {
     #businessTable tr{
         margin-bottom:1rem;
         border:1px solid #e5e7eb;
-        border-radius:14px;
+        border-radius:8px;
         overflow:hidden;
         background:#fff;
     }

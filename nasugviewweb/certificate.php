@@ -146,7 +146,7 @@ body.left-panel-hidden .main-content{
 .panel{
     background:rgba(255,255,255,.9);
     border:1px solid rgba(0,26,71,.08);
-    border-radius:20px;
+    border-radius:10px;
     box-shadow:var(--shadow);
     backdrop-filter:blur(10px);
 }
@@ -243,7 +243,7 @@ body.left-panel-hidden .main-content{
     justify-content:space-between;
     min-height:74px;
     padding:10px;
-    border-radius:14px;
+    border-radius:8px;
     background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
     border:1px solid rgba(0,26,71,.08);
     box-shadow:0 12px 24px rgba(0,26,71,.18);
@@ -315,7 +315,7 @@ body.left-panel-hidden .main-content{
     min-width:44px;
     height:44px;
     padding:0 14px;
-    border-radius:14px;
+    border-radius:8px;
     font-size:13px;
     font-weight:600;
     background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
@@ -390,7 +390,7 @@ body.left-panel-hidden .main-content{
     top:calc(100% + 8px);
     min-width:180px;
     padding:8px;
-    border-radius:14px;
+    border-radius:8px;
     border:1px solid rgba(0,26,71,.12);
     background:rgba(255,255,255,.98);
     box-shadow:0 18px 40px rgba(15,23,42,.18);
@@ -434,7 +434,7 @@ body.left-panel-hidden .main-content{
 .board-toolbar{
     margin:0 14px;
     padding:8px 10px;
-    border-radius:14px;
+    border-radius:8px;
     background:linear-gradient(180deg, #ffffff 0%, #eef3fa 100%);
     border:1px solid rgba(0,26,71,.08);
     display:flex;
@@ -480,7 +480,7 @@ body.left-panel-hidden .main-content{
     height:40px;
     padding:0 12px;
     border:1px solid var(--line);
-    border-radius:12px;
+    border-radius:8px;
     background:#fff;
     font:inherit;
     color:var(--ink);
@@ -499,7 +499,7 @@ body.left-panel-hidden .main-content{
 .board-stage{
     position:relative;
     padding:10px;
-    border-radius:20px;
+    border-radius:10px;
     background:
         linear-gradient(180deg, rgba(255,255,255,.94), rgba(238,243,250,.96)),
         repeating-linear-gradient(0deg, rgba(0,26,71,.04) 0, rgba(0,26,71,.04) 1px, transparent 1px, transparent 34px),
@@ -757,7 +757,7 @@ body.left-panel-hidden .main-content{
 .empty-state{
     padding:12px 14px;
     border:1px dashed rgba(0,26,71,.15);
-    border-radius:14px;
+    border-radius:8px;
     color:rgba(255,255,255,.88);
     background:linear-gradient(135deg, rgba(0,26,71,.92) 0%, rgba(0,48,138,.92) 100%);
     font-size:12px;
@@ -772,7 +772,7 @@ body.left-panel-hidden .main-content{
 .template-card{
     width:100%;
     padding:8px;
-    border-radius:14px;
+    border-radius:8px;
     background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
     border:1px solid rgba(0,26,71,.08);
     text-align:left;
@@ -925,7 +925,7 @@ body.left-panel-hidden .main-content{
 .footer-note{
     margin:14px 16px 0;
     padding:12px 14px;
-    border-radius:14px;
+    border-radius:8px;
     background:linear-gradient(180deg, rgba(212,175,55,.12), rgba(212,175,55,.04));
     color:#5e4a0a;
     font-size:12px;
@@ -948,7 +948,7 @@ body.left-panel-hidden .main-content{
     min-width:72px;
     height:36px;
     padding:0 12px;
-    border-radius:12px;
+    border-radius:8px;
     display:inline-flex;
     align-items:center;
     justify-content:center;
@@ -963,7 +963,7 @@ body.left-panel-hidden .main-content{
 .collapsible{
     margin-top:10px;
     border:1px solid rgba(0,26,71,.08);
-    border-radius:14px;
+    border-radius:8px;
     background:linear-gradient(180deg, rgba(255,255,255,.98) 0%, rgba(238,243,250,.95) 100%);
     overflow:hidden;
 }
@@ -1026,7 +1026,7 @@ body.left-panel-hidden .main-content{
     height:42px;
     min-width:42px;
     border:none;
-    border-radius:12px;
+    border-radius:8px;
     background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
     color:#fff;
     display:inline-flex;
@@ -1053,7 +1053,7 @@ body.left-panel-hidden .main-content{
     z-index:1200;
     display:none;
     box-shadow:0 12px 24px rgba(0,26,71,.12);
-    border-radius:12px;
+    border-radius:8px;
 }
 
 .panel-toggle-float::after{
@@ -1097,7 +1097,7 @@ body.inspector-hidden .inspector-panel{
     position:fixed;
     min-width:220px;
     padding:8px;
-    border-radius:18px;
+    border-radius:10px;
     border:1px solid rgba(0,26,71,.12);
     background:rgba(255,255,255,.98);
     box-shadow:0 22px 55px rgba(15,23,42,.18);
@@ -1126,7 +1126,7 @@ body.inspector-hidden .inspector-panel{
     gap:16px;
     padding:11px 12px;
     border:none;
-    border-radius:12px;
+    border-radius:8px;
     background:transparent;
     color:var(--ink);
     font:inherit;
@@ -1224,7 +1224,7 @@ body.exporting #canvas::before{
     .panel-toggle-float{
         top:18px;
         left:70px;
-        border-radius:12px;
+        border-radius:8px;
     }
 }
 
@@ -1234,7 +1234,7 @@ body.exporting #canvas::before{
     }
 
     .panel{
-        border-radius:14px;
+        border-radius:10px;
         box-shadow:0 12px 30px rgba(0,26,71,.10);
     }
 

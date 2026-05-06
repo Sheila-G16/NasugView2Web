@@ -42,7 +42,7 @@ body{
 }
 
 .card{
-    border-radius:18px;
+    border-radius:10px;
     padding:2rem;
     background:#fff;
     border-left:6px solid #001a47;
@@ -79,7 +79,7 @@ body{
 }
 
 .alert{
-    border-radius:12px;
+    border-radius:8px;
     padding:1rem 1.5rem;
 }
 
@@ -106,7 +106,7 @@ body{
     .card{
         margin:1rem .75rem 0;
         padding:1.25rem;
-        border-radius:16px;
+        border-radius:10px;
         max-width:none;
     }
 }

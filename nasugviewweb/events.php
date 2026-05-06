@@ -38,6 +38,7 @@ if(isset($_SESSION['user_id'])) {
 // ==============================
 $sql = "SELECT *, 
         CASE 
+            WHEN status = 'Canceled' THEN 'Canceled'
             WHEN NOW() < start_date_and_time THEN 'For Implementation'
             WHEN NOW() BETWEEN start_date_and_time AND end_date_and_time THEN 'Ongoing'
             WHEN NOW() > end_date_and_time THEN 'Implemented'
@@ -68,7 +69,7 @@ $pastEvents = $conn->query("SELECT COUNT(*) as total FROM events WHERE end_date_
 <style>
 body { font-family:'Poppins', sans-serif; background:#f0f4ff; }
 .main-content { margin-left:250px; padding:2rem; min-height:100vh; }
-.card { border-radius:18px; padding:2rem; background:#fff; border-left:6px solid #001a47; box-shadow:0 8px 25px rgba(0,0,0,0.08); }
+.card { border-radius:10px; padding:2rem; background:#fff; border-left:6px solid #001a47; box-shadow:0 8px 25px rgba(0,0,0,0.08); }
 .card h3 { color:#001a47; font-weight:700; margin-bottom:1.5rem; }
 
 .form-control, .form-select, textarea { border-radius:10px; border:1px solid #d6e4ff; box-shadow:0 0 0 3px rgba(0,26,71,0.08); padding:8px 10px; height:44px; }
@@ -83,8 +84,8 @@ textarea.form-control { height:120px; resize:none; }
 
 .row.g-3 > div { margin-bottom:16px; }
 
-.table th { background: linear-gradient(135deg,#001a47,#00308a); color:white; border:none; padding:1rem; font-weight:600; font-size:0.9rem; }
-.table td { padding:1rem; vertical-align:middle; border-bottom:1px solid #f1f3f4; }
+.table th { background: linear-gradient(135deg,#001a47,#00308a); color:white; border:none; padding:.75rem .65rem; font-weight:600; font-size:0.78rem; line-height:1.2; white-space:normal; }
+.table td { padding:.75rem .65rem; vertical-align:middle; border-bottom:1px solid #f1f3f4; font-size:0.88rem; }
 
 .action-buttons { display:flex; gap:0.5rem; align-items:center; }
 .btn-action { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; border:none; transition: all 0.3s ease; background: linear-gradient(135deg,#001a47,#00308a); color:white; }
@@ -113,7 +114,7 @@ textarea.form-control { height:120px; resize:none; }
 @media (max-width:768px) {
     .card {
         padding:1.25rem;
-        border-radius:16px;
+        border-radius:10px;
     }
 
     .row.mb-4 {
@@ -154,7 +155,7 @@ textarea.form-control { height:120px; resize:none; }
     #eventsTable tr {
         margin-bottom:1rem;
         border:1px solid #e5e7eb;
-        border-radius:14px;
+        border-radius:8px;
         overflow:hidden;
         background:#fff;
     }
@@ -185,9 +186,10 @@ textarea.form-control { height:120px; resize:none; }
     #eventsTable td:nth-child(2)::before { content:"Start & End Date"; }
     #eventsTable td:nth-child(3)::before { content:"Duration"; }
     #eventsTable td:nth-child(4)::before { content:"Event Code"; }
-    #eventsTable td:nth-child(5)::before { content:"Status"; }
-    #eventsTable td:nth-child(6)::before { content:"Remarks"; }
-    #eventsTable td:nth-child(7)::before { content:"Actions"; }
+    #eventsTable td:nth-child(5)::before { content:"Mode of Delivery"; }
+    #eventsTable td:nth-child(6)::before { content:"Status"; }
+    #eventsTable td:nth-child(7)::before { content:"Remarks"; }
+    #eventsTable td:nth-child(8)::before { content:"Actions"; }
 
     .action-buttons {
         justify-content:flex-end;
@@ -234,6 +236,7 @@ textarea.form-control { height:120px; resize:none; }
                     <th>Start & End Date</th>
                     <th>Duration</th>
                     <th>Event Code</th>
+                    <th>Mode</th>
                     <th>Status</th>
                     <th>Remarks</th>
                     <th>Actions</th>
@@ -253,15 +256,23 @@ textarea.form-control { height:120px; resize:none; }
                         $duration = ($days>0 ? $days."d ":"").($hours>0 ? $hours."h ":"").($minutes>0 ? $minutes."m":"");
                     }
 
-                    $event_code = "EVT" . str_pad($event['id'], 4, "0", STR_PAD_LEFT);
+                    $event_code = trim($event['event_code'] ?? '') !== ''
+                        ? $event['event_code']
+                        : "EVT" . str_pad($event['id'], 4, "0", STR_PAD_LEFT);
                     $status = $event['calculated_status'];
-                    $remarks = ($status == 'For Implementation') ? "Incoming" : (($status=='Ongoing') ? "In Progress" : "Done");
+                    $defaultRemarks = ($status == 'For Implementation') ? "Incoming" : (($status=='Ongoing') ? "In Progress" : "Done");
+                    $remarks = trim($event['remarks'] ?? '') !== '' ? $event['remarks'] : $defaultRemarks;
+                    $storedStatus = trim($event['status'] ?? '');
+                    $canCancel = !in_array($status, ['Implemented', 'Done', 'Canceled'], true)
+                        && !in_array($storedStatus, ['Implemented', 'Done', 'Canceled'], true)
+                        && strcasecmp(trim($remarks), 'Done') !== 0;
                 ?>
                 <tr>
                     <td><?php echo htmlspecialchars($event['title']); ?></td>
                     <td><?php echo date("M d, Y h:i A", $start) . " - " . date("M d, Y h:i A", $end); ?></td>
                     <td><?php echo $duration; ?></td>
-                    <td><?php echo $event_code; ?></td>
+                    <td><?php echo htmlspecialchars($event_code); ?></td>
+                    <td><?php echo htmlspecialchars($event['mode_of_delivery'] ?: 'N/A'); ?></td>
                     <td><?php echo htmlspecialchars($status); ?></td>
                     <td><?php echo $remarks; ?></td>
                     <td>
@@ -276,6 +287,7 @@ textarea.form-control { height:120px; resize:none; }
                                 data-remarks="<?php echo $remarks; ?>"
                                 data-address="<?php echo htmlspecialchars($event['address']); ?>"
                                 data-mode="<?php echo htmlspecialchars($event['mode_of_delivery'] ?: 'N/A'); ?>"
+                                data-google-meet-link="<?php echo htmlspecialchars($event['google_meet_link'] ?: 'N/A'); ?>"
                                 data-speaker="<?php echo htmlspecialchars($event['speaker'] ?: 'N/A'); ?>"
                                 data-audience="<?php echo htmlspecialchars($event['audience'] ?: 'N/A'); ?>"
                                 data-budget="<?php echo htmlspecialchars($event['budget'] ?: 'N/A'); ?>"
@@ -294,8 +306,17 @@ textarea.form-control { height:120px; resize:none; }
                                     <li><a class="dropdown-item downloadPDF" href="#" data-event-id="<?php echo $event['id']; ?>">Download PDF</a></li>
                                     <li><a class="dropdown-item viewPDF" href="#" data-event-id="<?php echo $event['id']; ?>">View as PDF</a></li>
                                     <li><a class="dropdown-item editEvent" href="edit_event.php?id=<?php echo $event['id']; ?>">Edit</a></li>
-                                    <li><a class="dropdown-item rescheduleEvent" href="#" data-event-id="<?php echo $event['id']; ?>">Reschedule</a></li>
-                                    <li><a class="dropdown-item text-warning cancelEvent" href="#" data-event-id="<?php echo $event['id']; ?>">Cancel</a></li>
+                                    <li><a class="dropdown-item rescheduleEvent" href="#"
+                                        data-event-id="<?php echo $event['id']; ?>"
+                                        data-old-start="<?php echo date('Y-m-d\TH:i', $start); ?>"
+                                        data-old-end="<?php echo date('Y-m-d\TH:i', $end); ?>"
+                                        data-old-start-display="<?php echo date('M d, Y h:i A', $start); ?>"
+                                        data-old-end-display="<?php echo date('M d, Y h:i A', $end); ?>">Reschedule</a></li>
+                                    <?php if ($canCancel): ?>
+                                    <li><a class="dropdown-item text-warning cancelEvent" href="#" data-event-id="<?php echo $event['id']; ?>" data-status="<?php echo htmlspecialchars($status); ?>">Cancel</a></li>
+                                    <?php else: ?>
+                                    <li><span class="dropdown-item text-muted disabled">Cancel unavailable</span></li>
+                                    <?php endif; ?>
                                     <li><hr class="dropdown-divider"></li>
                                     <li><a class="dropdown-item text-danger deleteEvent" href="#" data-event-id="<?php echo $event['id']; ?>">Delete</a></li>
                                 </ul>
@@ -327,6 +348,7 @@ textarea.form-control { height:120px; resize:none; }
         <p><strong>Remarks:</strong> <span id="modalRemarks"></span></p>
         <p><strong>Address / Venue:</strong> <span id="modalAddress"></span></p>
         <p><strong>Mode of Delivery:</strong> <span id="modalMode"></span></p>
+        <p><strong>Google Meet Link:</strong> <span id="modalGoogleMeetLink"></span></p>
         <p><strong>Resource Speaker:</strong> <span id="modalSpeaker"></span></p>
         <p><strong>Target Audience:</strong> <span id="modalAudience"></span></p>
         <p><strong>Budget:</strong> <span id="modalBudget"></span></p>
@@ -372,6 +394,7 @@ viewButtons.forEach(btn => {
         document.getElementById('modalRemarks').textContent = btn.dataset.remarks;
         document.getElementById('modalAddress').textContent = btn.dataset.address;
         document.getElementById('modalMode').textContent    = btn.dataset.mode;
+        document.getElementById('modalGoogleMeetLink').textContent = btn.dataset.googleMeetLink;
         document.getElementById('modalSpeaker').textContent = btn.dataset.speaker;
         document.getElementById('modalAudience').textContent= btn.dataset.audience;
         document.getElementById('modalBudget').textContent  = btn.dataset.budget;
@@ -388,7 +411,7 @@ document.querySelectorAll('.downloadPDF').forEach(btn => {
     btn.addEventListener('click', e => {
         e.preventDefault();
         const eventId = btn.dataset.eventId;
-        window.location.href = `download_event.php?id=${eventId}`;
+        window.open(`download_event.php?id=${eventId}`, '_blank');
     });
 });
 
@@ -404,28 +427,50 @@ document.querySelectorAll('.rescheduleEvent').forEach(btn => {
     btn.addEventListener('click', e => {
         e.preventDefault();
         const eventId = btn.dataset.eventId;
+        const oldStart = btn.dataset.oldStartDisplay;
+        const oldEnd = btn.dataset.oldEndDisplay;
         Swal.fire({
             title: 'Reschedule Event',
             html: `
-                <label>Start Date & Time:</label>
-                <input type="datetime-local" id="newStart" class="swal2-input">
-                <label>End Date & Time:</label>
-                <input type="datetime-local" id="newEnd" class="swal2-input">
+                <div class="text-start">
+                    <label class="form-label mb-1"><strong>Old Start Date & Time</strong></label>
+                    <input type="text" class="swal2-input" value="${oldStart}" readonly>
+                    <label class="form-label mb-1"><strong>Old End Date & Time</strong></label>
+                    <input type="text" class="swal2-input" value="${oldEnd}" readonly>
+                    <label class="form-label mb-1"><strong>New Start Date & Time</strong></label>
+                    <input type="datetime-local" id="newStart" class="swal2-input" value="${btn.dataset.oldStart}">
+                    <label class="form-label mb-1"><strong>New End Date & Time</strong></label>
+                    <input type="datetime-local" id="newEnd" class="swal2-input" value="${btn.dataset.oldEnd}">
+                    <label class="form-label mb-1"><strong>Reason / Remarks</strong></label>
+                    <textarea id="rescheduleRemarks" class="swal2-textarea" placeholder="Why is this event being rescheduled?"></textarea>
+                </div>
             `,
             confirmButtonText: 'Update',
             showCancelButton: true,
             preConfirm: () => {
                 const start = document.getElementById('newStart').value;
                 const end = document.getElementById('newEnd').value;
-                if(!start || !end) Swal.showValidationMessage('Please fill both dates');
-                return {start, end};
+                const remarks = document.getElementById('rescheduleRemarks').value.trim();
+                if(!start || !end) {
+                    Swal.showValidationMessage('Please fill both dates');
+                    return false;
+                }
+                if(new Date(end) <= new Date(start)) {
+                    Swal.showValidationMessage('End date must be later than start date');
+                    return false;
+                }
+                if(!remarks) {
+                    Swal.showValidationMessage('Please add the reschedule reason in remarks');
+                    return false;
+                }
+                return {start, end, remarks};
             }
         }).then(result => {
             if(result.isConfirmed){
                 fetch('reschedule_event.php', {
                     method:'POST',
                     headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({id:eventId, start:result.value.start, end:result.value.end})
+                    body: JSON.stringify({id:eventId, start:result.value.start, end:result.value.end, remarks:result.value.remarks})
                 })
                 .then(res => res.json())
                 .then(data => {
@@ -441,6 +486,11 @@ document.querySelectorAll('.cancelEvent').forEach(btn => {
     btn.addEventListener('click', e => {
         e.preventDefault();
         const eventId = btn.dataset.eventId;
+        const status = btn.dataset.status;
+        if(status === 'Implemented' || status === 'Done') {
+            Swal.fire('Not allowed', 'This event already happened, so it cannot be canceled.', 'info');
+            return;
+        }
         Swal.fire({
             title:'Cancel Event?',
             text:'This will mark the event as canceled.',
