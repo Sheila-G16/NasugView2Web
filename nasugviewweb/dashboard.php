@@ -32,48 +32,126 @@ $totalAdmins = $conn->query("SELECT COUNT(*) as total FROM negosyo_center_users 
 $totalStaff = $conn->query("SELECT COUNT(*) as total FROM negosyo_center_users WHERE designation='Staff'")->fetch_assoc()['total'] ?? 0;
 $totalAttendees = $conn->query("SELECT COUNT(*) as total FROM event_registrations")
                        ->fetch_assoc()['total'] ?? 0; 
-/* ===== MEETING ATTENDEES DATA ===== */
-$meetingLabels = [];
-$meetingCounts = [];
+/* ===== ATTENDEES BY CITY DATA ===== */
+$municipalityYear = isset($_GET['municipality_year']) ? trim((string) $_GET['municipality_year']) : '';
+$municipalityMonth = isset($_GET['municipality_month']) ? trim((string) $_GET['municipality_month']) : '';
+$municipalityDay = isset($_GET['municipality_day']) ? trim((string) $_GET['municipality_day']) : '';
 
-$meetingQuery = "
-    SELECT DATE(created_at) as meeting_date, COUNT(*) as total
-    FROM event_registrations
-    GROUP BY DATE(created_at)
-    ORDER BY DATE(created_at) ASC
-";
+$municipalityYear = preg_match('/^\d{4}$/', $municipalityYear) ? $municipalityYear : '';
+$municipalityMonth = preg_match('/^\d{4}-\d{2}$/', $municipalityMonth) ? $municipalityMonth : '';
+$municipalityDay = preg_match('/^\d{4}-\d{2}-\d{2}$/', $municipalityDay) ? $municipalityDay : '';
 
-$meetingResult = $conn->query($meetingQuery);
+$municipalityFilterType = 'year';
+$municipalityFilterValue = $municipalityYear !== '' ? $municipalityYear : date('Y');
+$municipalityLabelExpression = "DATE_FORMAT(created_at, '%Y-%m')";
+$municipalityWhereClause = 'YEAR(created_at) = ?';
+$municipalityParams = [$municipalityFilterValue];
+$municipalityParamTypes = 'i';
+$municipalityXAxisTitle = 'Month';
 
-if ($meetingResult) {
-    while ($row = $meetingResult->fetch_assoc()) {
-        $meetingLabels[] = date("M d", strtotime($row['meeting_date']));
-        $meetingCounts[] = (int)$row['total'];
-    }
+if ($municipalityDay !== '') {
+    $municipalityFilterType = 'day';
+    $municipalityFilterValue = $municipalityDay;
+    $municipalityLabelExpression = 'DATE(created_at)';
+    $municipalityWhereClause = 'DATE(created_at) = ?';
+    $municipalityParams = [$municipalityDay];
+    $municipalityParamTypes = 's';
+    $municipalityXAxisTitle = 'Date';
+} elseif ($municipalityMonth !== '') {
+    $municipalityFilterType = 'month';
+    $municipalityFilterValue = $municipalityMonth;
+    $municipalityLabelExpression = 'DATE(created_at)';
+    $municipalityWhereClause = "DATE_FORMAT(created_at, '%Y-%m') = ?";
+    $municipalityParams = [$municipalityMonth];
+    $municipalityParamTypes = 's';
+    $municipalityXAxisTitle = 'Day';
 }
 
-/* ===== ATTENDEES BY CITY DATA ===== */
 $municipalityLabels = [];
-$municipalityCounts = [];
+$municipalityMonthLabels = [];
+$municipalitySeries = [];
+$municipalityMonthKeys = [];
+$municipalityData = [];
+$municipalityTotals = [];
 
 $municipalityQuery = "
-    SELECT city, COUNT(*) AS total
+    SELECT
+        city,
+        {$municipalityLabelExpression} AS date_key,
+        COUNT(*) AS total
     FROM event_registrations
     WHERE city IS NOT NULL
         AND TRIM(city) <> ''
-    GROUP BY city
-    ORDER BY total DESC, city ASC
+        AND created_at IS NOT NULL
+        AND {$municipalityWhereClause}
+    GROUP BY city, {$municipalityLabelExpression}
+    ORDER BY date_key ASC, city ASC
 ";
 
-$municipalityResult = $conn->query($municipalityQuery);
+$municipalityStmt = $conn->prepare($municipalityQuery);
+
+$municipalityResult = null;
+if ($municipalityStmt) {
+    $municipalityStmt->bind_param($municipalityParamTypes, ...$municipalityParams);
+    $municipalityStmt->execute();
+    $municipalityResult = $municipalityStmt->get_result();
+}
 
 if ($municipalityResult) {
     while ($row = $municipalityResult->fetch_assoc()) {
-        $municipalityLabels[] = $row['city'];
-        $municipalityCounts[] = (int) $row['total'];
+        $city = trim((string) $row['city']);
+        $monthKey = (string) $row['date_key'];
+        $total = (int) $row['total'];
+
+        $municipalityMonthKeys[$monthKey] = true;
+        $municipalityData[$city][$monthKey] = $total;
+        $municipalityTotals[$city] = ($municipalityTotals[$city] ?? 0) + $total;
     }
 }
-$municipalityChartMinWidth = max(600, count($municipalityLabels) * 110);
+
+if ($municipalityStmt) {
+    $municipalityStmt->close();
+}
+
+if ($municipalityFilterType === 'year') {
+    $municipalityMonthKeys = [];
+    for ($m = 1; $m <= 12; $m++) {
+        $municipalityMonthKeys[] = $municipalityFilterValue . '-' . str_pad((string) $m, 2, '0', STR_PAD_LEFT);
+    }
+} elseif ($municipalityFilterType === 'month') {
+    $municipalityMonthKeys = [];
+    $daysInMunicipalityMonth = (int) date('t', strtotime($municipalityFilterValue . '-01'));
+    for ($d = 1; $d <= $daysInMunicipalityMonth; $d++) {
+        $municipalityMonthKeys[] = $municipalityFilterValue . '-' . str_pad((string) $d, 2, '0', STR_PAD_LEFT);
+    }
+} elseif ($municipalityFilterType === 'day') {
+    $municipalityMonthKeys = [$municipalityFilterValue];
+}
+
+uksort($municipalityTotals, function ($a, $b) use ($municipalityTotals) {
+    $totalCompare = $municipalityTotals[$b] <=> $municipalityTotals[$a];
+    return $totalCompare !== 0 ? $totalCompare : strcasecmp($a, $b);
+});
+
+foreach ($municipalityMonthKeys as $monthKey) {
+    if ($municipalityFilterType === 'year') {
+        $municipalityMonthLabels[] = date('M Y', strtotime($monthKey . '-01'));
+    } elseif ($municipalityFilterType === 'month') {
+        $municipalityMonthLabels[] = date('M j', strtotime($monthKey));
+    } else {
+        $municipalityMonthLabels[] = date('M j, Y', strtotime($monthKey));
+    }
+}
+
+foreach (array_keys($municipalityTotals) as $city) {
+    $municipalityLabels[] = $city;
+    $municipalitySeries[] = [
+        'label' => $city,
+        'data' => array_map(function ($monthKey) use ($municipalityData, $city) {
+            return $municipalityData[$city][$monthKey] ?? 0;
+        }, $municipalityMonthKeys)
+    ];
+}
 /* EVENTS FILTERS */
 $year = isset($_GET['year']) ? trim((string) $_GET['year']) : '';
 $month = isset($_GET['month']) ? trim((string) $_GET['month']) : '';
@@ -528,8 +606,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
     margin-bottom:2rem;
 }
 
-#municipalityChart,
-#meetingChart{
+#municipalityChart{
     height:180px !important;
 }
 
@@ -1245,7 +1322,45 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
     <div class="white-card municipality-card">
         <div class="d-flex justify-content-between mb-2">
             <h6>Number of invited Attendees by Municipality</h6>
-
+            <div class="dropdown filter-wrap">
+                <button class="btn btn-sm filter-btn filter-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Filter municipality chart">
+                    <i class="fas fa-calendar-alt"></i>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end filter-menu">
+                    <form id="municipalityFilterForm" class="filter-form">
+                        <div class="filter-options">
+                            <button type="button" class="filter-option municipality-filter-option <?php echo $municipalityFilterType === 'year' ? 'active' : ''; ?>" data-type="year">Year</button>
+                            <button type="button" class="filter-option municipality-filter-option <?php echo $municipalityFilterType === 'month' ? 'active' : ''; ?>" data-type="month">Month</button>
+                            <button type="button" class="filter-option municipality-filter-option <?php echo $municipalityFilterType === 'day' ? 'active' : ''; ?>" data-type="day">Day</button>
+                        </div>
+                        <input
+                            id="municipalityFilterValue"
+                            class="form-control form-control-sm filter-input filter-value"
+                            value="<?php echo htmlspecialchars($municipalityFilterValue); ?>"
+                            data-year="<?php echo htmlspecialchars($municipalityYear !== '' ? $municipalityYear : date('Y')); ?>"
+                            data-month="<?php echo htmlspecialchars($municipalityMonth); ?>"
+                            data-day="<?php echo htmlspecialchars($municipalityDay); ?>"
+                        >
+                        <input type="hidden" id="municipalityFilterType" value="<?php echo htmlspecialchars($municipalityFilterType); ?>">
+                        <?php if ($year !== ''): ?>
+                            <input type="hidden" data-preserve-param="year" value="<?php echo htmlspecialchars($year); ?>">
+                        <?php endif; ?>
+                        <?php if ($month !== ''): ?>
+                            <input type="hidden" data-preserve-param="month" value="<?php echo htmlspecialchars($month); ?>">
+                        <?php endif; ?>
+                        <?php if ($day !== ''): ?>
+                            <input type="hidden" data-preserve-param="day" value="<?php echo htmlspecialchars($day); ?>">
+                        <?php endif; ?>
+                        <?php if ($selectedLeadingYear > 0): ?>
+                            <input type="hidden" data-preserve-param="leading_year" value="<?php echo (int) $selectedLeadingYear; ?>">
+                        <?php endif; ?>
+                        <div class="filter-actions">
+                            <button type="submit" class="btn btn-sm filter-btn">Apply</button>
+                            <a href="<?php echo htmlspecialchars(strtok($_SERVER['REQUEST_URI'], '?')); ?>" class="btn btn-sm filter-reset">Reset</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
 
         <div class="municipality-chart-scroll">
@@ -1346,18 +1461,6 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
 
         </div>
 
-
-        <div class="white-card">
-            <div class="d-flex justify-content-between mb-2">
-                <h6>Meeting attendees</h6>
-
-                <select class="form-select form-select-sm" style="width:150px">
-                    <option>Month</option>
-                </select>
-            </div>
-
-            <canvas id="meetingChart"></canvas>
-        </div>
 
     </div>
 
@@ -1802,8 +1905,11 @@ const eventsChart = new Chart(ctx, {
 
 const filterType = document.getElementById('filterType');
 const filterValue = document.getElementById('filterValue');
-const filterOptions = document.querySelectorAll('.filter-option');
+const filterOptions = document.querySelectorAll('#filterForm .filter-option');
 const leadingYearValue = document.getElementById('leadingYearValue');
+const municipalityFilterTypeInput = document.getElementById('municipalityFilterType');
+const municipalityFilterValueInput = document.getElementById('municipalityFilterValue');
+const municipalityFilterOptions = document.querySelectorAll('#municipalityFilterForm .municipality-filter-option');
 
 function syncFilterInput() {
     const selectedType = filterType.value;
@@ -1857,9 +1963,73 @@ document.getElementById('filterForm').addEventListener('submit', function(e){
     if (leadingYearValue && leadingYearValue.value) {
         params.set('leading_year', leadingYearValue.value);
     }
+    if (municipalityFilterTypeInput && municipalityFilterValueInput && municipalityFilterValueInput.value) {
+        params.set('municipality_' + municipalityFilterTypeInput.value, municipalityFilterValueInput.value);
+    }
 
     window.location.href = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
 });
+
+function syncMunicipalityFilterInput() {
+    const selectedType = municipalityFilterTypeInput.value;
+    municipalityFilterValueInput.name = 'municipality_' + selectedType;
+
+    municipalityFilterOptions.forEach(option => {
+        option.classList.toggle('active', option.dataset.type === selectedType);
+    });
+
+    if (selectedType === 'year') {
+        municipalityFilterValueInput.type = 'number';
+        municipalityFilterValueInput.min = '2000';
+        municipalityFilterValueInput.max = '2100';
+        municipalityFilterValueInput.placeholder = 'Year';
+        municipalityFilterValueInput.value = municipalityFilterValueInput.dataset.year || new Date().getFullYear();
+    } else if (selectedType === 'month') {
+        municipalityFilterValueInput.type = 'month';
+        municipalityFilterValueInput.removeAttribute('min');
+        municipalityFilterValueInput.removeAttribute('max');
+        municipalityFilterValueInput.placeholder = '';
+        municipalityFilterValueInput.value = municipalityFilterValueInput.dataset.month || '';
+    } else {
+        municipalityFilterValueInput.type = 'date';
+        municipalityFilterValueInput.removeAttribute('min');
+        municipalityFilterValueInput.removeAttribute('max');
+        municipalityFilterValueInput.placeholder = '';
+        municipalityFilterValueInput.value = municipalityFilterValueInput.dataset.day || '';
+    }
+}
+
+if (municipalityFilterTypeInput && municipalityFilterValueInput) {
+    municipalityFilterOptions.forEach(option => {
+        option.addEventListener('click', function () {
+            municipalityFilterTypeInput.value = this.dataset.type;
+            syncMunicipalityFilterInput();
+        });
+    });
+
+    syncMunicipalityFilterInput();
+
+    document.getElementById('municipalityFilterForm').addEventListener('submit', function(e){
+        e.preventDefault();
+
+        municipalityFilterValueInput.dataset.year = municipalityFilterTypeInput.value === 'year' ? municipalityFilterValueInput.value : municipalityFilterValueInput.dataset.year;
+        municipalityFilterValueInput.dataset.month = municipalityFilterTypeInput.value === 'month' ? municipalityFilterValueInput.value : municipalityFilterValueInput.dataset.month;
+        municipalityFilterValueInput.dataset.day = municipalityFilterTypeInput.value === 'day' ? municipalityFilterValueInput.value : municipalityFilterValueInput.dataset.day;
+
+        const params = new URLSearchParams();
+        this.querySelectorAll('[data-preserve-param]').forEach(input => {
+            if (input.value) {
+                params.set(input.dataset.preserveParam, input.value);
+            }
+        });
+
+        if (municipalityFilterValueInput.value) {
+            params.set('municipality_' + municipalityFilterTypeInput.value, municipalityFilterValueInput.value);
+        }
+
+        window.location.href = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+    });
+}
 
 /* ===== ANIMATION COUNTER ===== */
 const counters = document.querySelectorAll('.counter');
@@ -1882,24 +2052,44 @@ counters.forEach(counter => {
 
 
 /* ===== MUNICIPALITY CHART ===== */
-new Chart(document.getElementById('municipalityChart'), {
+const municipalityMonthLabels = <?php echo json_encode($municipalityMonthLabels); ?>;
+const municipalitySeries = <?php echo json_encode($municipalitySeries); ?>;
+const municipalityColors = [
+    '#0d47a1',
+    '#d97706',
+    '#15803d',
+    '#be123c',
+    '#7c3aed',
+    '#0891b2',
+    '#b45309',
+    '#4338ca',
+    '#c026d3',
+    '#047857',
+    '#dc2626',
+    '#2563eb'
+];
+function getMunicipalityColor(index) {
+    return municipalityColors[index % municipalityColors.length];
+}
+
+const municipalityChart = new Chart(document.getElementById('municipalityChart'), {
     type: 'line',
     data: {
-        labels: <?php echo json_encode($municipalityLabels); ?>,
-        datasets: [
-            {
-                label:'',
-                data: <?php echo json_encode($municipalityCounts); ?>,
-                borderColor:'#0d47a1',
-                backgroundColor:'rgba(13, 71, 161, 0.12)',
-                pointBackgroundColor:'#0d47a1',
-                pointBorderColor:'#ffffff',
-                pointRadius:4,
-                pointHoverRadius:6,
-                fill:true,
-                tension:.35
-            }
-        ]
+        labels: municipalityMonthLabels,
+        datasets: municipalitySeries.map((series, index) => ({
+            label: series.label,
+            data: series.data,
+            borderColor: getMunicipalityColor(index),
+            backgroundColor: 'rgba(255,255,255,0)',
+            pointBackgroundColor: '#ffffff',
+            pointBorderColor: getMunicipalityColor(index),
+            pointBorderWidth: 2,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            borderWidth: 2,
+            fill: false,
+            tension: .35
+        }))
     },
     options:{
         responsive:true,
@@ -1910,16 +2100,20 @@ new Chart(document.getElementById('municipalityChart'), {
                 position:'top',
                 labels:{
                     generateLabels(chart){
-                        const labels = chart.data.labels || [];
-                        return labels.map((label, index) => ({
-                            text: label,
-                            fillStyle: '#0d47a1',
-                            strokeStyle: '#0d47a1',
-                            lineWidth: 1,
-                            hidden: false,
-                            index: index
+                        return chart.data.datasets.map((dataset, index) => ({
+                            text: dataset.label,
+                            fillStyle: 'rgba(255,255,255,0)',
+                            strokeStyle: dataset.borderColor,
+                            lineWidth: 2,
+                            hidden: !chart.isDatasetVisible(index),
+                            datasetIndex: index
                         }));
                     }
+                },
+                onClick(e, legendItem, legend) {
+                    const datasetIndex = legendItem.datasetIndex;
+                    legend.chart.setDatasetVisibility(datasetIndex, !legend.chart.isDatasetVisible(datasetIndex));
+                    legend.chart.update();
                 }
             },
             tooltip:{
@@ -1928,54 +2122,22 @@ new Chart(document.getElementById('municipalityChart'), {
                 bodyColor:'#fff',
                 callbacks:{
                     label:function(context){
-                        return 'Count: ' + context.parsed.y;
+                        return context.dataset.label + ': ' + context.parsed.y;
                     }
                 }
             }
         },
         scales:{
             x:{
+                title:{display:true, text:<?php echo json_encode($municipalityXAxisTitle); ?>, color:'#001a47', font:{weight:600}},
                 grid:{display:false},
                 ticks:{color:'#001a47', autoSkip:false, maxRotation:0, minRotation:0}
             },
             y:{
                 beginAtZero:true,
+                title:{display:true, text:'Invited Attendees Count', color:'#001a47', font:{weight:600}},
                 ticks:{stepSize:1, color:'#001a47'},
                 grid:{color:'rgba(0,26,71,0.1)'}
-            }
-        }
-    }
-});
-
-
-/* ===== MEETING CHART (REAL DATA) ===== */
-new Chart(document.getElementById('meetingChart'), {
-    type: 'bar',
-    data: {
-        labels: <?php echo json_encode($meetingLabels); ?>,
-        datasets: [{
-            label:'Attendees',
-            data: <?php echo json_encode($meetingCounts); ?>,
-            backgroundColor:[
-                '#0d2f6b',
-                '#00308a',
-                '#001a47',
-                '#021f5a',
-                '#123a8c',
-                '#0b2c63'
-            ]
-        }]
-    },
-    options:{
-        responsive:true,
-        maintainAspectRatio:false,
-        plugins:{
-            legend:{display:false}
-        },
-        scales:{
-            y:{
-                beginAtZero:true,
-                ticks:{stepSize:1}
             }
         }
     }
