@@ -2143,7 +2143,21 @@ const municipalityChart = new Chart(document.getElementById('municipalityChart')
     }
 });
 
-const csfPalette = ['#2563eb', '#f97316', '#94a3b8', '#facc15', '#38bdf8'];
+const csfPalette = ['#001a47', '#00308a', '#1d5ea8', '#20584a', '#2d7c66', '#64748b'];
+const chartTextColor = '#001a47';
+const chartBorderColor = '#ffffff';
+
+function getThemePalette(count) {
+    return Array.from({ length: count }, (_, index) => csfPalette[index % csfPalette.length]);
+}
+
+function percentLabel(context) {
+    const values = context.dataset.data || [];
+    const total = values.reduce((sum, value) => sum + Number(value || 0), 0);
+    const value = Number(context.parsed || 0);
+    const percent = total ? ((value / total) * 100).toFixed(1) : '0.0';
+    return `${context.label}: ${value} (${percent}%)`;
+}
 
 function createStaticDoughnutChart(id, labels, data) {
     const canvas = document.getElementById(id);
@@ -2155,29 +2169,41 @@ function createStaticDoughnutChart(id, labels, data) {
             labels,
             datasets: [{
                 data,
-                backgroundColor: csfPalette,
-                borderColor: '#ffffff',
-                borderWidth: 2,
-                hoverOffset: 4
+                backgroundColor: getThemePalette(data.length),
+                borderColor: chartBorderColor,
+                borderWidth: 3,
+                hoverBorderColor: chartBorderColor,
+                hoverBorderWidth: 4,
+                hoverOffset: 8
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            cutout: '56%',
+            cutout: '58%',
+            layout: {
+                padding: 8
+            },
             plugins: {
                 legend: {
                     position: 'right',
                     labels: {
                         boxWidth: 12,
-                        color: '#001a47',
-                        font: { size: 11 }
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        color: chartTextColor,
+                        font: { size: 11, weight: 600 }
                     }
                 },
                 tooltip: {
-                    backgroundColor: '#001a47',
+                    backgroundColor: chartTextColor,
                     titleColor: '#fff',
-                    bodyColor: '#fff'
+                    bodyColor: '#fff',
+                    padding: 10,
+                    displayColors: true,
+                    callbacks: {
+                        label: percentLabel
+                    }
                 }
             }
         }
@@ -2194,27 +2220,40 @@ function createStaticPieChart(id, labels, data) {
             labels,
             datasets: [{
                 data,
-                backgroundColor: csfPalette,
-                borderColor: '#ffffff',
-                borderWidth: 2
+                backgroundColor: getThemePalette(data.length),
+                borderColor: chartBorderColor,
+                borderWidth: 3,
+                hoverBorderColor: chartBorderColor,
+                hoverBorderWidth: 4,
+                hoverOffset: 8
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            layout: {
+                padding: 8
+            },
             plugins: {
                 legend: {
                     position: 'right',
                     labels: {
                         boxWidth: 12,
-                        color: '#001a47',
-                        font: { size: 11 }
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        color: chartTextColor,
+                        font: { size: 11, weight: 600 }
                     }
                 },
                 tooltip: {
-                    backgroundColor: '#001a47',
+                    backgroundColor: chartTextColor,
                     titleColor: '#fff',
-                    bodyColor: '#fff'
+                    bodyColor: '#fff',
+                    padding: 10,
+                    displayColors: true,
+                    callbacks: {
+                        label: percentLabel
+                    }
                 }
             }
         }

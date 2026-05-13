@@ -28,20 +28,36 @@ body{
     box-shadow:0 8px 25px rgba(0,0,0,0.08);
 }
 
-/* SAME TABLE STYLE AS EVENTS */
-.table th{
-    background: linear-gradient(135deg,#001a47,#00308a);
-    color:white;
-    border:none;
-    padding:1rem;
-    font-weight:600;
-    font-size:0.9rem;
+/* Table styles */
+.table-responsive{
+    border:1px solid rgba(0,26,71,.08);
+    border-radius:10px;
+    overflow:hidden;
+    background:#fff;
 }
 
+.table{
+    border-collapse:collapse;
+}
+
+.table th,
 .table td{
-    padding:1rem;
-    vertical-align:middle;
-    border-bottom:1px solid #f1f3f4;
+    border:1px solid rgba(15,23,42,.08);
+    padding:.62rem .75rem;
+    font-size:.88rem;
+    vertical-align:top;
+}
+
+.table th{
+    background:linear-gradient(135deg,#123c73,#1d5ea8);
+    color:white;
+    font-weight:600;
+    line-height:1.25;
+    white-space:normal;
+}
+
+.table tbody tr:nth-child(even) td{
+    background:#f8fafc;
 }
 
 /* SAME ACTION BUTTONS */
@@ -96,7 +112,10 @@ body{
     }
 
     .table-responsive{
+        border:0;
+        border-radius:0;
         overflow:visible;
+        background:transparent;
     }
 
     #staffTable thead{
