@@ -71,6 +71,24 @@ body { font-family:'Poppins', sans-serif; background:#f0f4ff; }
 .main-content { margin-left:250px; padding:2rem; min-height:100vh; }
 .card { border-radius:10px; padding:2rem; background:#fff; border-left:6px solid #001a47; box-shadow:0 8px 25px rgba(0,0,0,0.08); }
 .card h3 { color:#001a47; font-weight:700; margin-bottom:1.5rem; }
+.event-stat-card {
+    background:linear-gradient(180deg,#ffffff 0%, #f8fbff 100%);
+    border:1px solid rgba(0,26,71,.08);
+    border-left:0;
+    padding:1rem;
+}
+.event-stat-card h4 {
+    margin:0 0 .25rem;
+    font-size:.82rem;
+    color:#6b7280;
+    font-weight:600;
+}
+.event-stat-card h2 {
+    margin:0;
+    font-size:1.4rem;
+    color:#001a47;
+    font-weight:700;
+}
 
 .form-control, .form-select, textarea { border-radius:10px; border:1px solid #d6e4ff; box-shadow:0 0 0 3px rgba(0,26,71,0.08); padding:8px 10px; height:44px; }
 textarea.form-control { height:120px; resize:none; }
@@ -84,8 +102,12 @@ textarea.form-control { height:120px; resize:none; }
 
 .row.g-3 > div { margin-bottom:16px; }
 
-.table th { background: linear-gradient(135deg,#001a47,#00308a); color:white; border:none; padding:.75rem .65rem; font-weight:600; font-size:0.78rem; line-height:1.2; white-space:normal; }
-.table td { padding:.75rem .65rem; vertical-align:middle; border-bottom:1px solid #f1f3f4; font-size:0.88rem; }
+.table-responsive { border:1px solid rgba(0,26,71,.08); border-radius:10px; overflow:hidden; background:#fff; }
+.table { border-collapse:collapse; }
+.table th,
+.table td { border:1px solid rgba(15,23,42,.08); padding:.62rem .75rem; font-size:0.88rem; vertical-align:top; }
+.table th { background:linear-gradient(135deg,#123c73,#1d5ea8); color:white; font-weight:600; line-height:1.25; white-space:normal; }
+.table tbody tr:nth-child(even) td { background:#f8fafc; }
 
 .action-buttons { display:flex; gap:0.5rem; align-items:center; }
 .btn-action { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; border:none; transition: all 0.3s ease; background: linear-gradient(135deg,#001a47,#00308a); color:white; }
@@ -137,7 +159,10 @@ textarea.form-control { height:120px; resize:none; }
     }
 
     .table-responsive {
+        border:0;
+        border-radius:0;
         overflow:visible;
+        background:transparent;
     }
 
     #eventsTable thead {
@@ -216,9 +241,9 @@ textarea.form-control { height:120px; resize:none; }
 
     <!-- Events Stats -->
     <div class="row mb-4">
-        <div class="col-md-4"><div class="card p-3 text-center"><h4>Total Events</h4><h2><?php echo $totalEvents; ?></h2></div></div>
-        <div class="col-md-4"><div class="card p-3 text-center"><h4>Upcoming Events</h4><h2><?php echo $upcomingEvents; ?></h2></div></div>
-        <div class="col-md-4"><div class="card p-3 text-center"><h4>Past Events</h4><h2><?php echo $pastEvents; ?></h2></div></div>
+        <div class="col-md-4"><div class="card event-stat-card text-center"><h4>Total Events</h4><h2><?php echo $totalEvents; ?></h2></div></div>
+        <div class="col-md-4"><div class="card event-stat-card text-center"><h4>Upcoming Events</h4><h2><?php echo $upcomingEvents; ?></h2></div></div>
+        <div class="col-md-4"><div class="card event-stat-card text-center"><h4>Past Events</h4><h2><?php echo $pastEvents; ?></h2></div></div>
     </div>
 
     <!-- Events Table -->

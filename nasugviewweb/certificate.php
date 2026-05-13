@@ -62,6 +62,28 @@ if (isset($_GET['load'])) {
     exit;
 }
 
+if (isset($_POST['delete_template'])) {
+    $name = basename($_POST['delete_template']);
+    $jsonFile = $saveDir . $name . ".json";
+    $pngFile = $saveDir . $name . ".png";
+    $deleted = false;
+
+    if (is_file($jsonFile)) {
+        $deleted = unlink($jsonFile) || $deleted;
+    }
+
+    if (is_file($pngFile)) {
+        $deleted = unlink($pngFile) || $deleted;
+    }
+
+    header("Content-Type: application/json");
+    echo json_encode([
+        "status" => $deleted ? "deleted" : "missing",
+        "name" => $name
+    ]);
+    exit;
+}
+
 $templateFiles = glob($saveDir . "*.png") ?: [];
 $templates = [];
 
@@ -770,12 +792,23 @@ body.left-panel-hidden .main-content{
 }
 
 .template-card{
+    position:relative;
     width:100%;
     padding:8px;
     border-radius:8px;
     background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
     border:1px solid rgba(0,26,71,.08);
     text-align:left;
+}
+
+.template-load-btn{
+    width:100%;
+    padding:0;
+    border:none;
+    background:transparent;
+    color:inherit;
+    text-align:left;
+    cursor:pointer;
 }
 
 .template-card img{
@@ -796,6 +829,30 @@ body.left-panel-hidden .main-content{
 .template-card span{
     font-size:11px;
     color:rgba(255,255,255,.8);
+}
+
+.template-delete-btn{
+    position:absolute;
+    top:10px;
+    right:10px;
+    width:28px;
+    height:28px;
+    border:none;
+    border-radius:999px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(255,255,255,.92);
+    color:#991b1b;
+    box-shadow:0 8px 18px rgba(15,23,42,.18);
+    cursor:pointer;
+    transition:.2s ease;
+}
+
+.template-delete-btn:hover,
+.template-delete-btn:focus-visible{
+    background:#fff;
+    transform:scale(1.05);
 }
 
 .inspector{
@@ -1096,6 +1153,7 @@ body.inspector-hidden .inspector-panel{
 .context-menu{
     position:fixed;
     min-width:220px;
+    max-width:min(260px, calc(100vw - 24px));
     padding:8px;
     border-radius:10px;
     border:1px solid rgba(0,26,71,.12);
@@ -1103,6 +1161,9 @@ body.inspector-hidden .inspector-panel{
     box-shadow:0 22px 55px rgba(15,23,42,.18);
     z-index:5000;
     display:none;
+    max-height:calc(100vh - 24px);
+    overflow-y:auto;
+    overflow-x:hidden;
 }
 
 .context-menu.open{
@@ -1468,11 +1529,16 @@ body.exporting #canvas::before{
                                 <div class="empty-state">Your saved designs will show here after you click <strong>Save Template</strong>.</div>
                             <?php else: ?>
                                 <?php foreach ($templates as $template): ?>
-                                    <button class="template-card" type="button" data-template="<?= htmlspecialchars($template['name']) ?>">
-                                        <img src="<?= htmlspecialchars($template['preview']) ?>" alt="<?= htmlspecialchars($template['name']) ?>">
-                                        <strong><?= htmlspecialchars(str_replace('_', ' ', $template['name'])) ?></strong>
-                                        <span>Click to load this layout</span>
-                                    </button>
+                                    <div class="template-card">
+                                        <button class="template-delete-btn" type="button" data-delete-template="<?= htmlspecialchars($template['name']) ?>" aria-label="Delete saved template">
+                                            <i class="fas fa-trash" aria-hidden="true"></i>
+                                        </button>
+                                        <button class="template-load-btn" type="button" data-template="<?= htmlspecialchars($template['name']) ?>">
+                                            <img src="<?= htmlspecialchars($template['preview']) ?>" alt="<?= htmlspecialchars($template['name']) ?>">
+                                            <strong><?= htmlspecialchars(str_replace('_', ' ', $template['name'])) ?></strong>
+                                            <span>Click to load this layout</span>
+                                        </button>
+                                    </div>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </div>
@@ -1503,7 +1569,7 @@ body.exporting #canvas::before{
                     </button>
                     <button class="action-btn icon-only" type="button" id="deleteBtn" aria-label="Delete">
                         <i class="fas fa-trash" aria-hidden="true"></i>
-                        <span class="btn-tooltip">Delete (Del)</span>
+                        <span class="btn-tooltip">Delete (Del or Ctrl + X)</span>
                     </button>
                     <button class="action-btn icon-only" type="button" id="lockBtn" aria-label="Lock selected">
                         <i class="fas fa-lock" aria-hidden="true"></i>
@@ -1588,7 +1654,7 @@ body.exporting #canvas::before{
                     </div>
                 </div>
             </div>
-            <div class="shortcut-note">Shortcuts: Ctrl + click multi-select, Ctrl + A select all, Ctrl + S save, Ctrl + Z undo, Ctrl + Y or Ctrl + Shift + Z redo, Ctrl + Plus zoom in, Ctrl + Minus zoom out, Delete remove, right-click any element for layer options.</div>
+            <div class="shortcut-note">Shortcuts: Ctrl + click multi-select, Ctrl + A select all, Ctrl + S save, Ctrl + Z undo, Ctrl + Y or Ctrl + Shift + Z redo, Ctrl + Plus zoom in, Ctrl + Minus zoom out, Delete or Ctrl + X remove, right-click any element for layer options.</div>
         </main>
 
         <aside class="panel inspector inspector-panel" id="inspectorPanel">
@@ -2616,13 +2682,18 @@ function setRotation(item, angle) {
 }
 
 function openContextMenu(x, y) {
-    const menuWidth = 220;
-    const menuHeight = 340;
-    const maxX = window.innerWidth - menuWidth - 16;
-    const maxY = window.innerHeight - menuHeight - 16;
-    contextMenu.style.left = `${Math.max(12, Math.min(x, maxX))}px`;
-    contextMenu.style.top = `${Math.max(12, Math.min(y, maxY))}px`;
     contextMenu.classList.add('open');
+    const menuWidth = contextMenu.offsetWidth || 220;
+    const viewportPadding = 12;
+    const availableHeight = Math.max(160, window.innerHeight - (viewportPadding * 2));
+    contextMenu.style.maxHeight = `${availableHeight}px`;
+    contextMenu.scrollTop = 0;
+
+    const menuHeight = contextMenu.offsetHeight || availableHeight;
+    const maxX = window.innerWidth - menuWidth - viewportPadding;
+    const maxY = window.innerHeight - menuHeight - viewportPadding;
+    contextMenu.style.left = `${Math.max(viewportPadding, Math.min(x, maxX))}px`;
+    contextMenu.style.top = `${Math.max(viewportPadding, Math.min(y, maxY))}px`;
 }
 
 function closeContextMenu() {
@@ -3109,12 +3180,40 @@ function loadTemplate(name) {
         .then((layout) => restoreLayout(layout, true));
 }
 
+function deleteTemplate(name) {
+    const params = new URLSearchParams();
+    params.set('delete_template', name);
+
+    fetch('', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+    })
+        .then((response) => response.json())
+        .then((result) => {
+            if (result.status === 'deleted' || result.status === 'missing') {
+                window.location.reload();
+            }
+        });
+}
+
 document.querySelectorAll('[data-add]').forEach((button) => {
     button.addEventListener('click', () => addPreset(button.dataset.add));
 });
 
-document.querySelectorAll('[data-template]').forEach((button) => {
-    button.addEventListener('click', () => loadTemplate(button.dataset.template));
+document.getElementById('templateList')?.addEventListener('click', (event) => {
+    const deleteButton = event.target.closest('[data-delete-template]');
+    if (deleteButton) {
+        event.preventDefault();
+        event.stopPropagation();
+        deleteTemplate(deleteButton.dataset.deleteTemplate);
+        return;
+    }
+
+    const templateButton = event.target.closest('[data-template]');
+    if (templateButton) {
+        loadTemplate(templateButton.dataset.template);
+    }
 });
 
 document.getElementById('undoBtn').addEventListener('click', undo);
@@ -3371,6 +3470,12 @@ document.addEventListener('keydown', (event) => {
     if (event.ctrlKey && event.key.toLowerCase() === 'd' && selectedItem) {
         event.preventDefault();
         duplicateSelected();
+        return;
+    }
+
+    if (event.ctrlKey && event.key.toLowerCase() === 'x' && selectedItem && !editingField) {
+        event.preventDefault();
+        deleteSelected();
         return;
     }
 

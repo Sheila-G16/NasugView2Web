@@ -100,10 +100,35 @@ body {
     box-shadow:0 5px 25px rgba(0,0,0,0.08);
 }
 
+.table-responsive{
+    border:1px solid rgba(0,26,71,.08);
+    border-radius:10px;
+    overflow:hidden;
+    background:#fff;
+}
+
+.table{
+    border-collapse:collapse;
+}
+
+.table th,
+.table td{
+    border:1px solid rgba(15,23,42,.08);
+    padding:.62rem .75rem;
+    font-size:.88rem;
+    vertical-align:top;
+}
+
 .table th{
-    background:linear-gradient(135deg,var(--primary-color),var(--gradient-end));
+    background:linear-gradient(135deg,#123c73,#1d5ea8);
     color:white;
     font-weight:600;
+    line-height:1.25;
+    white-space:normal;
+}
+
+.table tbody tr:nth-child(even) td{
+    background:#f8fafc;
 }
 
 .btn-action{
@@ -131,6 +156,10 @@ body {
     padding-left:35px;
 }
 
+.page-title{
+    color:var(--primary-color);
+}
+
 @media (max-width:992px){
     .main-content{
         margin-left:0;
@@ -154,7 +183,10 @@ body {
     }
 
     .table-responsive{
+        border:0;
+        border-radius:0;
         overflow:visible;
+        background:transparent;
     }
 
     #businessTable thead{
@@ -234,7 +266,7 @@ body {
     <!-- HEADER -->
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
         <div>
-            <h2 class="fw-bold text-primary">Businesses</h2>
+            <h2 class="fw-bold page-title">List of Registered Businesses</h2>
             <p class="text-muted mb-0">Manage and monitor all businesses</p>
         </div>
 
