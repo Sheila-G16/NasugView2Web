@@ -1,16 +1,7 @@
 <?php
 session_start();
 
-// ==============================
-// Database connection
-// ==============================
-$servername = "localhost";
-$username   = "root";
-$password   = "";
-$dbname     = "nasugview2";
-
-$conn = new mysqli($servername, $username, $password, $dbname);
-if ($conn->connect_error) die("Connection failed: " . $conn->connect_error);
+require_once __DIR__ . "/db.php";
 
 function buildEventCode($eventId) {
     return "EVT" . str_pad((string)$eventId, 4, "0", STR_PAD_LEFT);

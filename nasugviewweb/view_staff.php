@@ -1,6 +1,6 @@
 <?php
 session_start();
-$conn = new mysqli("localhost","root","","nasugview2");
+require_once __DIR__ . "/db.php";
 $staff=$conn->query("SELECT * FROM negosyo_center_users WHERE designation='Staff'");
 ?>
 

@@ -1,8 +1,7 @@
 <?php
 session_start();
 
-$conn = new mysqli("localhost", "root", "", "nasugview2");
-if ($conn->connect_error) die("Connection failed: " . $conn->connect_error);
+require_once __DIR__ . "/db.php";
 
 $id = intval($_GET['id'] ?? 0);
 if (!$id) die("Invalid event.");

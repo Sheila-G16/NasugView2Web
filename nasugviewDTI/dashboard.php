@@ -1,14 +1,7 @@
 <?php
 session_start();
 
-/* DATABASE CONNECTION */
-$servername = "localhost";
-$username   = "root";
-$password   = "";
-$dbname     = "nasugview2";
-
-$conn = new mysqli($servername, $username, $password, $dbname);
-if ($conn->connect_error) die("Database connection failed: " . $conn->connect_error);
+require_once __DIR__ . "/db.php";
 
 /* DEFAULT VALUES */
 $admin_fullname = "User";

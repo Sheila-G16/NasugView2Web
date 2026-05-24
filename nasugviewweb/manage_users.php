@@ -1,7 +1,6 @@
 <?php
 session_start();
-$conn = new mysqli("localhost","root","","nasugview2");
-if($conn->connect_error) die("DB Error");
+require_once __DIR__ . "/db.php";
 
 if(isset($_GET['delete'])){
     $id=intval($_GET['delete']);
