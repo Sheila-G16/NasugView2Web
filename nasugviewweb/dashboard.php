@@ -296,135 +296,453 @@ if ($leadingBusinessStmt) {
     }
 }
 
+$evaluationEventOptions = [];
+$evaluationEventResult = $conn->query("
+    SELECT
+        ee.event_code,
+        ee.event_id,
+        COUNT(*) AS total_responses,
+        MIN(ee.created_at) AS first_response_at,
+        MAX(ee.created_at) AS last_response_at,
+        e.title,
+        e.start_date_and_time,
+        e.end_date_and_time
+    FROM event_evaluations ee
+    LEFT JOIN events e
+        ON e.id = ee.event_id
+    WHERE ee.event_code IS NOT NULL
+        AND TRIM(ee.event_code) <> ''
+    GROUP BY
+        ee.event_code,
+        ee.event_id,
+        e.title,
+        e.start_date_and_time,
+        e.end_date_and_time
+    ORDER BY last_response_at DESC, ee.event_code ASC
+");
+
+if ($evaluationEventResult) {
+    while ($row = $evaluationEventResult->fetch_assoc()) {
+        $evaluationEventOptions[] = $row;
+    }
+}
+
+$selectedEvaluationEventCode = isset($_GET['evaluation_event_code']) ? trim((string) $_GET['evaluation_event_code']) : '';
+$validEvaluationEventCodes = array_map(function ($event) {
+    return (string) $event['event_code'];
+}, $evaluationEventOptions);
+
+if ($selectedEvaluationEventCode === '' || !in_array($selectedEvaluationEventCode, $validEvaluationEventCodes, true)) {
+    $selectedEvaluationEventCode = $validEvaluationEventCodes[0] ?? '';
+}
+
+$selectedEvaluationEvent = null;
+foreach ($evaluationEventOptions as $eventOption) {
+    if ((string) $eventOption['event_code'] === $selectedEvaluationEventCode) {
+        $selectedEvaluationEvent = $eventOption;
+        break;
+    }
+}
+
+$evaluationRows = [];
+$evaluationResult = null;
+if ($selectedEvaluationEventCode !== '') {
+    $evaluationStmt = $conn->prepare("
+        SELECT
+            id,
+            event_id,
+            event_code,
+            full_name,
+            client_type,
+            sex,
+            age_group,
+            cc1,
+            cc2,
+            cc3,
+            overall_rating,
+            content_rating,
+            speaker_rating,
+            responsiveness_rating,
+            reliability_rating,
+            access_facilities_rating,
+            communication_rating,
+            integrity_rating,
+            assurance_rating,
+            outcome_rating,
+            created_at
+        FROM event_evaluations
+        WHERE event_code = ?
+        ORDER BY created_at DESC, id DESC
+    ");
+
+    if ($evaluationStmt) {
+        $evaluationStmt->bind_param("s", $selectedEvaluationEventCode);
+        $evaluationStmt->execute();
+        $evaluationResult = $evaluationStmt->get_result();
+    }
+}
+
+if ($evaluationResult) {
+    while ($row = $evaluationResult->fetch_assoc()) {
+        $evaluationRows[] = $row;
+    }
+}
+
+if (isset($evaluationStmt) && $evaluationStmt) {
+    $evaluationStmt->close();
+}
+
+function evaluationCell($value) {
+    return ($value === null || $value === '') ? '-' : $value;
+}
+
+function evaluationPercent($count, $total) {
+    return $total > 0 ? number_format(($count / $total) * 100, 2) . '%' : '0.00%';
+}
+
+function evaluationRatingLabel($percent) {
+    if ($percent >= 95) {
+        return 'Outstanding';
+    }
+    if ($percent >= 80) {
+        return 'Very Satisfactory';
+    }
+    if ($percent >= 60) {
+        return 'Satisfactory';
+    }
+    if ($percent > 0) {
+        return 'Fair';
+    }
+    return 'N/A';
+}
+
+function normalizeEvaluationValue($value) {
+    $value = trim((string) $value);
+    return $value === '' ? 'Did not specify' : $value;
+}
+
+function countEvaluationOptions($rows, $field, $options, $normalizer = null) {
+    $counts = array_fill_keys(array_keys($options), 0);
+
+    foreach ($rows as $row) {
+        $value = $normalizer ? $normalizer($row[$field] ?? '') : normalizeEvaluationValue($row[$field] ?? '');
+        if (!array_key_exists($value, $counts)) {
+            $value = 'Did not specify';
+        }
+        $counts[$value]++;
+    }
+
+    $total = count($rows);
+    $tableRows = [];
+    foreach ($options as $key => $label) {
+        $tableRows[] = [$label, $counts[$key] ?? 0, evaluationPercent($counts[$key] ?? 0, $total)];
+    }
+
+    return $tableRows;
+}
+
+function countRatingLevels($rows, $fields) {
+    $counts = [5 => 0, 4 => 0, 3 => 0, 2 => 0, 1 => 0];
+    $total = 0;
+
+    foreach ($rows as $row) {
+        foreach ($fields as $field) {
+            if (($row[$field] ?? '') === '' || $row[$field] === null) {
+                continue;
+            }
+
+            $rating = (int) $row[$field];
+            if (isset($counts[$rating])) {
+                $counts[$rating]++;
+                $total++;
+            }
+        }
+    }
+
+    return [$counts, $total];
+}
+
+function leadingEvaluationRow($rows) {
+    $leading = null;
+
+    foreach ($rows as $row) {
+        $label = (string) ($row[0] ?? '');
+        $count = (int) ($row[1] ?? 0);
+
+        if ($label === 'Did not specify') {
+            continue;
+        }
+
+        if ($leading === null || $count > (int) $leading[1]) {
+            $leading = $row;
+        }
+    }
+
+    return $leading;
+}
+
+function formatEvaluationEventSchedule($event) {
+    if (!$event || empty($event['start_date_and_time'])) {
+        return '';
+    }
+
+    $start = strtotime($event['start_date_and_time']);
+    $end = !empty($event['end_date_and_time']) ? strtotime($event['end_date_and_time']) : null;
+
+    if (!$start) {
+        return '';
+    }
+
+    if ($end && date('Y-m-d', $start) !== date('Y-m-d', $end)) {
+        return date('F j, Y', $start) . ' to ' . date('F j, Y', $end);
+    }
+
+    $schedule = date('F j, Y', $start);
+    if ($end) {
+        $schedule .= ' (' . date('g:i A', $start) . ' - ' . date('g:i A', $end) . ')';
+    }
+
+    return $schedule;
+}
+
+function buildDimensionSummary($rows, $field, $label) {
+    [$counts, $total] = countRatingLevels($rows, [$field]);
+    $satisfied = ($counts[5] ?? 0) + ($counts[4] ?? 0);
+    $percentValue = $total > 0 ? ($satisfied / $total) * 100 : 0;
+
+    return [
+        $label,
+        number_format($percentValue, 2) . '%',
+        evaluationRatingLabel($percentValue),
+        $counts,
+        $total
+    ];
+}
+
+$totalResponses = count($evaluationRows);
+$firstEvaluationDate = $totalResponses ? end($evaluationRows)['created_at'] : null;
+$lastEvaluationDate = $totalResponses ? $evaluationRows[0]['created_at'] : null;
+$selectedEvaluationEventTitle = $selectedEvaluationEvent && !empty($selectedEvaluationEvent['title'])
+    ? $selectedEvaluationEvent['title']
+    : ($selectedEvaluationEventCode !== '' ? $selectedEvaluationEventCode : 'No event selected');
+$selectedEvaluationEventSchedule = formatEvaluationEventSchedule($selectedEvaluationEvent);
+$evaluationPeriod = 'No evaluations submitted yet';
+if ($selectedEvaluationEventSchedule !== '') {
+    $evaluationPeriod = $selectedEvaluationEventSchedule;
+} elseif ($firstEvaluationDate && $lastEvaluationDate) {
+    $evaluationPeriod = date('F j, Y', strtotime($firstEvaluationDate));
+    if (date('Y-m-d', strtotime($firstEvaluationDate)) !== date('Y-m-d', strtotime($lastEvaluationDate))) {
+        $evaluationPeriod .= ' to ' . date('F j, Y', strtotime($lastEvaluationDate));
+    }
+}
+
+$dimensionFields = [
+    'responsiveness_rating',
+    'reliability_rating',
+    'access_facilities_rating',
+    'communication_rating',
+    'integrity_rating',
+    'assurance_rating',
+    'outcome_rating'
+];
+[$overallCounts, $overallRatingTotal] = countRatingLevels($evaluationRows, array_merge(['overall_rating'], $dimensionFields));
+$overallSatisfied = ($overallCounts[5] ?? 0) + ($overallCounts[4] ?? 0);
+$overallPercentValue = $overallRatingTotal > 0 ? ($overallSatisfied / $overallRatingTotal) * 100 : 0;
+
 $csfOverview = [
     'office' => 'Bureau/Office',
-    'process' => 'Business Advisory and Client Support',
-    'period' => 'For the period [Month, DD, YYYY]',
-    'total_responses' => 31,
-    'total_clients' => 35,
-    'retrieval_rate' => '88.57%',
-    'overall_satisfaction' => '91.90%',
-    'adjectival_rating' => 'Very Satisfactory'
+    'process' => $selectedEvaluationEventTitle,
+    'period' => $evaluationPeriod,
+    'total_responses' => $totalResponses,
+    'total_clients' => $totalResponses,
+    'retrieval_rate' => $totalResponses > 0 ? '100.00%' : '0.00%',
+    'overall_satisfaction' => number_format($overallPercentValue, 2) . '%',
+    'adjectival_rating' => evaluationRatingLabel($overallPercentValue)
 ];
 
-$tabulationRows = [
-    [1, 'Client 1', '20-34', 'M', 'Citizen', 1, 1, 1, 5, 5, 5, 5, 4, '-', 4, 5, 4],
-    [2, 'Client 2', '19 or lower', 'F', 'Business', 1, 1, 1, 5, 5, 5, 5, 4, '-', 4, 5, 4],
-    [3, 'Client 3', '50-64', 'M', 'Citizen', 1, 1, 1, 5, 5, 5, 5, 4, '-', 4, 5, 4],
-    [4, 'Client 4', '20-34', 'M', 'Business', 1, 1, 1, 5, 5, 5, 5, 4, '-', 4, 5, 4],
-    [5, 'Client 5', '20-34', 'M', 'Citizen', 1, 1, 1, 5, 5, 5, 5, 5, '-', 4, 5, 5],
-    [6, 'Client 6', '50-64', 'M', 'Business', 1, 1, 1, 5, 5, 5, 5, 5, '-', 4, 5, 5],
-    [7, 'Client 7', '50-64', 'F', 'Business', 1, 3, 1, 5, 5, 5, 5, 5, '-', 4, 5, 5],
-    [8, 'Client 8', '35-49', 'F', 'Business', 1, 1, 1, 5, 5, 5, 5, 5, '-', 4, 5, 5]
-];
+$tabulationRows = [];
+$speakerRows = [];
+foreach ($evaluationRows as $index => $row) {
+    $clientName = trim((string) ($row['full_name'] ?? ''));
+    if ($clientName === '') {
+        $clientName = 'Client ' . ($index + 1);
+    }
 
-$speakerRows = [
-    [1, 'Client 1', '20-34', 'M', 'Citizen', 4, 5, 5, 5, 5, 4, 4, 4],
-    [2, 'Client 2', '19 or lower', 'F', 'Business', 4, 5, 5, 5, 5, 4, 4, 4],
-    [3, 'Client 3', '50-64', 'M', 'Citizen', 4, 5, 5, 5, 5, 4, 4, 4],
-    [4, 'Client 4', '20-34', 'M', 'Business', 4, 5, 5, 5, 5, 4, 4, 4],
-    [5, 'Client 5', '20-34', 'M', 'Citizen', 5, 5, 5, 5, 5, 5, 5, 5],
-    [6, 'Client 6', '50-64', 'M', 'Business', 4, 5, 5, 5, 5, 5, 5, 5]
-];
+    $tabulationRows[] = [
+        $index + 1,
+        $clientName,
+        evaluationCell($row['age_group'] ?? null),
+        evaluationCell($row['sex'] ?? null),
+        evaluationCell($row['client_type'] ?? null),
+        evaluationCell($row['cc1'] ?? null),
+        evaluationCell($row['cc2'] ?? null),
+        evaluationCell($row['cc3'] ?? null),
+        evaluationCell($row['overall_rating'] ?? null),
+        evaluationCell($row['responsiveness_rating'] ?? null),
+        evaluationCell($row['reliability_rating'] ?? null),
+        evaluationCell($row['access_facilities_rating'] ?? null),
+        evaluationCell($row['communication_rating'] ?? null),
+        '-',
+        evaluationCell($row['integrity_rating'] ?? null),
+        evaluationCell($row['assurance_rating'] ?? null),
+        evaluationCell($row['outcome_rating'] ?? null)
+    ];
 
-$csfTables = [
-    [
-        'title' => "CC1 - Awareness of the Citizen's Charter",
-        'theme' => 'green',
-        'rows' => [
-            ['(1) I know what a CC is and I saw this office’s CC.', 30, '96.77%'],
-            ['(2) I know what a CC is but I did not see this office’s CC.', 0, '0.00%'],
-            ['(3) I learned of the CC only when I saw this office’s CC.', 0, '0.00%'],
-            ['(4) I do not know what a CC is and I did not see one.', 0, '0.00%'],
-            ['(-) Not Applicable', 1, '3.23%']
-        ],
-        'total' => [31, '100.00%']
-    ],
-    [
-        'title' => 'Sex Disaggregation',
-        'theme' => 'blue',
-        'rows' => [
-            ['Male', 17, '54.84%'],
-            ['Female', 13, '41.94%'],
-            ['Did not specify', 1, '3.23%']
-        ],
-        'total' => [31, '100.00%']
-    ],
-    [
-        'title' => 'Level of Satisfaction',
-        'theme' => 'blue',
-        'rows' => [
-            ['Strongly Agree', '', '55.24%'],
-            ['Agree', '', '36.67%'],
-            ['Neither Agree nor Disagree', '', '7.62%'],
-            ['Disagree', '', '0.48%'],
-            ['Strongly Disagree', '', '0.00%']
-        ],
-        'summary' => [
-            ['Overall Satisfaction', '91.90%'],
-            ['Adjectival Rating', 'Very Satisfactory']
-        ]
-    ],
-    [
-        'title' => "CC2 - Visibility of the Citizen's Charter",
-        'theme' => 'green',
-        'rows' => [
-            ['(1) Easy to see', 29, '93.55%'],
-            ['(2) Somewhat easy to see', 0, '0.00%'],
-            ['(3) Difficult to see', 1, '3.23%'],
-            ['(4) Not visible', 0, '0.00%'],
-            ['(5) N/A', 0, '0.00%'],
-            ['(-) Not Applicable', 1, '3.23%']
-        ],
-        'total' => [31, '100.00%']
-    ],
-    [
-        'title' => 'Age',
-        'theme' => 'blue',
-        'rows' => [
-            ['19 or lower', 2, '6.45%'],
-            ['20-34', 13, '41.94%'],
-            ['35-49', 9, '29.03%'],
-            ['50-64', 6, '19.35%'],
-            ['65 or higher', 0, '0.00%'],
-            ['Did not specify', 1, '3.23%']
-        ],
-        'total' => [31, '100.00%']
-    ],
-    [
-        'title' => "CC3 - Usefulness of the Citizen's Charter",
-        'theme' => 'green',
-        'rows' => [
-            ['(1) Helped very much', 30, '96.77%'],
-            ['(2) Somewhat helped', 0, '0.00%'],
-            ['(3) Did not help', 0, '0.00%'],
-            ['(-) Not Applicable', 1, '3.23%']
-        ],
-        'total' => [31, '100.00%']
-    ],
-    [
-        'title' => 'Client Type',
-        'theme' => 'blue',
-        'rows' => [
-            ['Citizen', 6, '19.35%'],
-            ['Business', 18, '58.06%'],
-            ['Government', 6, '19.35%'],
-            ['Did not specify', 1, '3.23%']
-        ],
-        'total' => [31, '100.00%']
-    ]
-];
+    $speakerRows[] = [
+        $index + 1,
+        $clientName,
+        evaluationCell($row['age_group'] ?? null),
+        evaluationCell($row['sex'] ?? null),
+        evaluationCell($row['client_type'] ?? null),
+        evaluationCell($row['content_rating'] ?? null),
+        evaluationCell($row['speaker_rating'] ?? null),
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-'
+    ];
+}
 
 $dimensionSummaries = [
-    ['Responsiveness', '93.55%', 'Very Satisfactory'],
-    ['Reliability', '67.74%', 'Fair'],
-    ['Access & Facilities', '96.77%', 'Outstanding'],
-    ['Communication', '93.55%', 'Very Satisfactory'],
-    ['Costs', '0.00%', 'N/A'],
-    ['Integrity', '77.41%', 'Fair'],
-    ['Assurance', '96.77%', 'Outstanding'],
-    ['Outcome', '96.77%', 'Outstanding']
+    buildDimensionSummary($evaluationRows, 'responsiveness_rating', 'Responsiveness'),
+    buildDimensionSummary($evaluationRows, 'reliability_rating', 'Reliability'),
+    buildDimensionSummary($evaluationRows, 'access_facilities_rating', 'Access & Facilities'),
+    buildDimensionSummary($evaluationRows, 'communication_rating', 'Communication'),
+    ['Costs', '0.00%', 'N/A', [5 => 0, 4 => 0, 3 => 0, 2 => 0, 1 => 0], 0],
+    buildDimensionSummary($evaluationRows, 'integrity_rating', 'Integrity'),
+    buildDimensionSummary($evaluationRows, 'assurance_rating', 'Assurance'),
+    buildDimensionSummary($evaluationRows, 'outcome_rating', 'Outcome')
 ];
+
+$sexRows = countEvaluationOptions($evaluationRows, 'sex', [
+    'Male' => 'Male',
+    'Female' => 'Female',
+    'Did not specify' => 'Did not specify'
+], function ($value) {
+    $value = strtolower(trim((string) $value));
+    if (in_array($value, ['m', 'male'], true)) {
+        return 'Male';
+    }
+    if (in_array($value, ['f', 'female'], true)) {
+        return 'Female';
+    }
+    return 'Did not specify';
+});
+
+$ageRows = countEvaluationOptions($evaluationRows, 'age_group', [
+    '19 or lower' => '19 or lower',
+    '20-34' => '20-34',
+    '35-49' => '35-49',
+    '50-64' => '50-64',
+    '65 or higher' => '65 or higher',
+    'Did not specify' => 'Did not specify'
+]);
+
+$clientTypeRows = countEvaluationOptions($evaluationRows, 'client_type', [
+    'Citizen' => 'Citizen',
+    'Business' => 'Business',
+    'Government' => 'Government',
+    'Did not specify' => 'Did not specify'
+]);
+
+$cc1Rows = countEvaluationOptions($evaluationRows, 'cc1', [
+    '1' => "(1) I know what a CC is and I saw this office's CC.",
+    '2' => "(2) I know what a CC is but I did not see this office's CC.",
+    '3' => "(3) I learned of the CC only when I saw this office's CC.",
+    '4' => '(4) I do not know what a CC is and I did not see one.',
+    'Did not specify' => '(-) Not Applicable'
+]);
+
+$cc2Rows = countEvaluationOptions($evaluationRows, 'cc2', [
+    '1' => '(1) Easy to see',
+    '2' => '(2) Somewhat easy to see',
+    '3' => '(3) Difficult to see',
+    '4' => '(4) Not visible',
+    '5' => '(5) N/A',
+    'Did not specify' => '(-) Not Applicable'
+]);
+
+$cc3Rows = countEvaluationOptions($evaluationRows, 'cc3', [
+    '1' => '(1) Helped very much',
+    '2' => '(2) Somewhat helped',
+    '3' => '(3) Did not help',
+    'Did not specify' => '(-) Not Applicable'
+]);
+
+$satisfactionLabels = [
+    5 => 'Strongly Agree',
+    4 => 'Agree',
+    3 => 'Neither Agree nor Disagree',
+    2 => 'Disagree',
+    1 => 'Strongly Disagree'
+];
+$satisfactionRows = [];
+foreach ($satisfactionLabels as $rating => $label) {
+    $satisfactionRows[] = [$label, $overallCounts[$rating] ?? 0, evaluationPercent($overallCounts[$rating] ?? 0, $overallRatingTotal)];
+}
+
+$csfTables = [
+    ['title' => "CC1 - Awareness of the Citizen's Charter", 'theme' => 'green', 'rows' => $cc1Rows, 'total' => [$totalResponses, evaluationPercent($totalResponses, $totalResponses)]],
+    ['title' => 'Sex Disaggregation', 'theme' => 'blue', 'rows' => $sexRows, 'total' => [$totalResponses, evaluationPercent($totalResponses, $totalResponses)]],
+    ['title' => 'Level of Satisfaction', 'theme' => 'blue', 'rows' => $satisfactionRows, 'summary' => [['Overall Satisfaction', $csfOverview['overall_satisfaction']], ['Adjectival Rating', $csfOverview['adjectival_rating']]]],
+    ['title' => "CC2 - Visibility of the Citizen's Charter", 'theme' => 'green', 'rows' => $cc2Rows, 'total' => [$totalResponses, evaluationPercent($totalResponses, $totalResponses)]],
+    ['title' => 'Age', 'theme' => 'blue', 'rows' => $ageRows, 'total' => [$totalResponses, evaluationPercent($totalResponses, $totalResponses)]],
+    ['title' => "CC3 - Usefulness of the Citizen's Charter", 'theme' => 'green', 'rows' => $cc3Rows, 'total' => [$totalResponses, evaluationPercent($totalResponses, $totalResponses)]],
+    ['title' => 'Client Type', 'theme' => 'blue', 'rows' => $clientTypeRows, 'total' => [$totalResponses, evaluationPercent($totalResponses, $totalResponses)]]
+];
+
+$reportMatrixRows = [];
+foreach ($satisfactionLabels as $rating => $label) {
+    $row = [$label, $overallCounts[$rating] ?? 0];
+    foreach ($dimensionSummaries as $dimension) {
+        $row[] = $dimension[3][$rating] ?? 0;
+    }
+    $reportMatrixRows[] = $row;
+}
+
+$reportMatrixTotals = ['Total', $overallRatingTotal];
+foreach ($dimensionSummaries as $dimension) {
+    $reportMatrixTotals[] = $dimension[4];
+}
+
+$sexChartData = array_column($sexRows, 1);
+$ageChartData = array_column($ageRows, 1);
+$clientTypeChartData = array_column($clientTypeRows, 1);
+$dimensionChartData = [];
+foreach ($dimensionSummaries as $dimension) {
+    $dimensionChartData[] = [
+        $dimension[3][5] ?? 0,
+        $dimension[3][4] ?? 0,
+        $dimension[3][3] ?? 0,
+        $dimension[3][2] ?? 0,
+        $dimension[3][1] ?? 0
+    ];
+}
+
+$leadingClientType = leadingEvaluationRow($clientTypeRows);
+$leadingAgeGroup = leadingEvaluationRow($ageRows);
+$leadingClientTypeText = $leadingClientType
+    ? $leadingClientType[0] . ' clients make up the largest segment with ' . $leadingClientType[1] . ' responses (' . $leadingClientType[2] . ')'
+    : 'No dominant client type is available yet';
+$leadingAgeGroupText = $leadingAgeGroup
+    ? 'the ' . $leadingAgeGroup[0] . ' age group accounts for the highest share with ' . $leadingAgeGroup[1] . ' responses (' . $leadingAgeGroup[2] . ')'
+    : 'no dominant age group is available yet';
+
+if ($totalResponses > 0) {
+    $responsePeriodText = date('Y-m-d', strtotime($firstEvaluationDate)) === date('Y-m-d', strtotime($lastEvaluationDate))
+        ? 'submitted on ' . date('F j, Y', strtotime($lastEvaluationDate))
+        : 'submitted from ' . date('F j, Y', strtotime($firstEvaluationDate)) . ' to ' . date('F j, Y', strtotime($lastEvaluationDate));
+    $eventScheduleText = $selectedEvaluationEventSchedule !== ''
+        ? 'held on ' . $selectedEvaluationEventSchedule
+        : 'with no event schedule recorded';
+    $descriptiveAnalysis = 'For event ' . $selectedEvaluationEventCode . ' - ' . $selectedEvaluationEventTitle . ', ' . $eventScheduleText . ', a total of ' . $csfOverview['total_responses'] . ' clients completed the Client Satisfaction Feedback form. These responses were ' . $responsePeriodText . '. The computed CSF rating for this event is ' . $csfOverview['overall_satisfaction'] . ', equivalent to a ' . $csfOverview['adjectival_rating'] . ' adjectival rating. For this event, ' . $leadingClientTypeText . ', while ' . $leadingAgeGroupText . '.';
+} else {
+    $descriptiveAnalysis = $selectedEvaluationEventCode !== ''
+        ? 'No descriptive analysis is available yet because there are no submitted evaluations for event ' . $selectedEvaluationEventCode . '.'
+        : 'No descriptive analysis is available yet because there are no evaluated event codes.';
+}
 ?>
 
 <!DOCTYPE html>
@@ -1504,7 +1822,44 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
         <div class="section-block">
             <div class="section-heading">
                 <h4>Customer Satisfaction Dashboard</h4>
-                <p>Static dashboard preview for the customer satisfaction tabulation, report, and graph views.</p>
+                <p>Live customer satisfaction tabulation, report, and graph views.</p>
+                <form method="get" class="row g-2 align-items-end mt-2">
+                    <div class="col-md-5 col-lg-4">
+                        <label class="form-label small text-muted mb-1" for="evaluationEventCode">Event Code</label>
+                        <select id="evaluationEventCode" name="evaluation_event_code" class="form-select form-select-sm filter-input" onchange="this.form.submit()">
+                            <?php if (!empty($evaluationEventOptions)): ?>
+                                <?php foreach ($evaluationEventOptions as $eventOption): ?>
+                                    <?php
+                                    $optionCode = (string) $eventOption['event_code'];
+                                    $optionSchedule = formatEvaluationEventSchedule($eventOption);
+                                    $optionLabel = $optionCode;
+                                    if (!empty($eventOption['title'])) {
+                                        $optionLabel .= ' - ' . $eventOption['title'];
+                                    }
+                                    if ($optionSchedule !== '') {
+                                        $optionLabel .= ' (' . $optionSchedule . ')';
+                                    }
+                                    ?>
+                                    <option value="<?php echo htmlspecialchars($optionCode); ?>" <?php echo $optionCode === $selectedEvaluationEventCode ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($optionLabel); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <option value="">No evaluated events found</option>
+                            <?php endif; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label class="form-label small text-muted mb-1">Event Date</label>
+                        <input type="text" class="form-control form-control-sm filter-input" value="<?php echo htmlspecialchars($selectedEvaluationEventSchedule !== '' ? $selectedEvaluationEventSchedule : 'No date recorded'); ?>" readonly>
+                    </div>
+                    <div class="col-md-auto">
+                        <button type="submit" class="btn btn-sm filter-btn">View Data</button>
+                        <a href="download_evaluations_excel.php?event_code=<?php echo urlencode($selectedEvaluationEventCode); ?>" class="btn btn-sm filter-btn">
+                            <i class="fas fa-file-excel me-1"></i> Download Excel
+                        </a>
+                    </div>
+                </form>
             </div>
 
             <div class="summary-panels">
@@ -1573,6 +1928,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
                             </tr>
                         </thead>
                         <tbody>
+                            <?php if (!empty($tabulationRows)): ?>
                             <?php foreach ($tabulationRows as $row): ?>
                                 <tr>
                                     <?php foreach ($row as $cell): ?>
@@ -1580,6 +1936,9 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
                                     <?php endforeach; ?>
                                 </tr>
                             <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr><td colspan="17" class="text-center text-muted">No evaluation responses found.</td></tr>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -1607,6 +1966,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
                             </tr>
                         </thead>
                         <tbody>
+                            <?php if (!empty($speakerRows)): ?>
                             <?php foreach ($speakerRows as $row): ?>
                                 <tr>
                                     <?php foreach ($row as $cell): ?>
@@ -1614,6 +1974,9 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
                                     <?php endforeach; ?>
                                 </tr>
                             <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr><td colspan="13" class="text-center text-muted">No speaker assessment responses found.</td></tr>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -1632,65 +1995,17 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>Strongly Agree</td>
-                                <td>244</td>
-                                <td>10</td>
-                                <td>16</td>
-                                <td>30</td>
-                                <td>11</td>
-                                <td>0</td>
-                                <td>0</td>
-                                <td>30</td>
-                                <td>0</td>
-                            </tr>
-                            <tr>
-                                <td>Agree</td>
-                                <td>77</td>
-                                <td>0</td>
-                                <td>5</td>
-                                <td>0</td>
-                                <td>18</td>
-                                <td>0</td>
-                                <td>24</td>
-                                <td>0</td>
-                                <td>30</td>
-                            </tr>
-                            <tr>
-                                <td>Neither Agree nor Disagree</td>
-                                <td>16</td>
-                                <td>0</td>
-                                <td>9</td>
-                                <td>1</td>
-                                <td>1</td>
-                                <td>0</td>
-                                <td>6</td>
-                                <td>0</td>
-                                <td>0</td>
-                            </tr>
-                            <tr>
-                                <td>Disagree</td>
-                                <td>1</td>
-                                <td>1</td>
-                                <td>0</td>
-                                <td>0</td>
-                                <td>0</td>
-                                <td>0</td>
-                                <td>0</td>
-                                <td>0</td>
-                                <td>0</td>
-                            </tr>
+                            <?php foreach ($reportMatrixRows as $matrixRow): ?>
+                                <tr>
+                                    <?php foreach ($matrixRow as $cell): ?>
+                                        <td><?php echo htmlspecialchars((string) $cell); ?></td>
+                                    <?php endforeach; ?>
+                                </tr>
+                            <?php endforeach; ?>
                             <tr class="total-row">
-                                <td>Total</td>
-                                <td>338</td>
-                                <td>11</td>
-                                <td>30</td>
-                                <td>31</td>
-                                <td>30</td>
-                                <td>31</td>
-                                <td>30</td>
-                                <td>30</td>
-                                <td>30</td>
+                                <?php foreach ($reportMatrixTotals as $cell): ?>
+                                    <td><?php echo htmlspecialchars((string) $cell); ?></td>
+                                <?php endforeach; ?>
                             </tr>
                             <tr class="rating-row">
                                 <td>CSF Rating</td>
@@ -1750,7 +2065,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
                         <?php if (($table['title'] ?? '') === 'Client Type'): ?>
                             <div class="narrative-card">
                                 <h6>Descriptive Analysis</h6>
-                                <p>During the period of <?php echo htmlspecialchars($csfOverview['period']); ?>, a total of <?php echo $csfOverview['total_clients']; ?> clients received a Client Satisfaction Feedback form related to the <?php echo htmlspecialchars($csfOverview['process']); ?> process. The office successfully collected <?php echo $csfOverview['total_responses']; ?> forms, resulting in a retrieval efficiency of <?php echo htmlspecialchars($csfOverview['retrieval_rate']); ?>. The computed CSF rating is <?php echo htmlspecialchars($csfOverview['overall_satisfaction']); ?>, which corresponds to a <?php echo htmlspecialchars($csfOverview['adjectival_rating']); ?> level of client satisfaction. Based on the static profile shown below, business clients make up the largest segment, while the 20-34 age group accounts for the highest share of respondents.</p>
+                                <p><?php echo htmlspecialchars($descriptiveAnalysis); ?></p>
                             </div>
                         <?php endif; ?>
                     <?php endforeach; ?>
@@ -1781,7 +2096,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
             <div class="section-block">
                 <div class="section-heading">
                     <h4>Demographic Profile</h4>
-                    <p>Static preview of the demographic charts from the spreadsheet graphs sheet.</p>
+                    <p>Live demographic charts based on submitted evaluations.</p>
                 </div>
                 <div class="graphs-grid">
                     <div class="graph-card">
@@ -1802,7 +2117,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
             <div class="section-block">
                 <div class="section-heading">
                     <h4>Service Quality Dimensions</h4>
-                    <p>Static donut charts for the service quality dimensions shown in the sample workbook.</p>
+                    <p>Live donut charts for the service quality dimensions.</p>
                 </div>
                 <div class="dimension-grid">
                     <div class="graph-card"><h6>Responsiveness</h6><div class="graph-canvas"><canvas id="dimensionResponsiveness"></canvas></div></div>
@@ -2253,19 +2568,20 @@ function createStaticPieChart(id, labels, data) {
     });
 }
 
-createStaticPieChart('sexChart', ['Male', 'Female', 'Did not specify'], [17, 13, 1]);
-createStaticPieChart('ageChart', ['19 or lower', '20-34', '35-49', '50-64', '65 or higher'], [2, 13, 9, 6, 0]);
-createStaticPieChart('clientTypeChart', ['Citizen', 'Business', 'Government', 'Did not specify'], [6, 18, 6, 1]);
+createStaticPieChart('sexChart', ['Male', 'Female', 'Did not specify'], <?php echo json_encode($sexChartData); ?>);
+createStaticPieChart('ageChart', ['19 or lower', '20-34', '35-49', '50-64', '65 or higher', 'Did not specify'], <?php echo json_encode($ageChartData); ?>);
+createStaticPieChart('clientTypeChart', ['Citizen', 'Business', 'Government', 'Did not specify'], <?php echo json_encode($clientTypeChartData); ?>);
 
 const satisfactionLabels = ['Strongly Agree', 'Agree', 'Neither Agree nor Disagree', 'Disagree', 'Strongly Disagree'];
-createStaticDoughnutChart('dimensionResponsiveness', satisfactionLabels, [29, 0, 1, 1, 0]);
-createStaticDoughnutChart('dimensionReliability', satisfactionLabels, [16, 5, 9, 0, 0]);
-createStaticDoughnutChart('dimensionAccess', satisfactionLabels, [30, 0, 1, 0, 0]);
-createStaticDoughnutChart('dimensionCommunication', satisfactionLabels, [11, 18, 1, 0, 0]);
-createStaticDoughnutChart('dimensionCosts', satisfactionLabels, [0, 0, 0, 0, 31]);
-createStaticDoughnutChart('dimensionIntegrity', satisfactionLabels, [0, 24, 6, 0, 0]);
-createStaticDoughnutChart('dimensionAssurance', satisfactionLabels, [30, 0, 1, 0, 0]);
-createStaticDoughnutChart('dimensionOutcome', satisfactionLabels, [0, 30, 0, 0, 0]);
+const dimensionChartData = <?php echo json_encode($dimensionChartData); ?>;
+createStaticDoughnutChart('dimensionResponsiveness', satisfactionLabels, dimensionChartData[0] || [0, 0, 0, 0, 0]);
+createStaticDoughnutChart('dimensionReliability', satisfactionLabels, dimensionChartData[1] || [0, 0, 0, 0, 0]);
+createStaticDoughnutChart('dimensionAccess', satisfactionLabels, dimensionChartData[2] || [0, 0, 0, 0, 0]);
+createStaticDoughnutChart('dimensionCommunication', satisfactionLabels, dimensionChartData[3] || [0, 0, 0, 0, 0]);
+createStaticDoughnutChart('dimensionCosts', satisfactionLabels, dimensionChartData[4] || [0, 0, 0, 0, 0]);
+createStaticDoughnutChart('dimensionIntegrity', satisfactionLabels, dimensionChartData[5] || [0, 0, 0, 0, 0]);
+createStaticDoughnutChart('dimensionAssurance', satisfactionLabels, dimensionChartData[6] || [0, 0, 0, 0, 0]);
+createStaticDoughnutChart('dimensionOutcome', satisfactionLabels, dimensionChartData[7] || [0, 0, 0, 0, 0]);
 </script>
 
 </body>
