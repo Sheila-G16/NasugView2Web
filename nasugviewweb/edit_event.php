@@ -1,7 +1,7 @@
 <?php
 session_start();
 
-$conn = new mysqli("localhost","root","","nasugview2");
+require_once __DIR__ . "/db.php";
 
 // Get event ID safely
 $id = intval($_GET['id']);

@@ -2,11 +2,7 @@
 session_start();
 header('Content-Type: application/json');
 
-$conn = new mysqli("localhost","root","","nasugview2");
-if ($conn->connect_error) {
-    echo json_encode(["success"=>false,"error"=>"DB connection failed"]);
-    exit;
-}
+require_once __DIR__ . "/db.php";
 
 $data = json_decode(file_get_contents("php://input"), true);
 $id = intval($data['id'] ?? 0);
