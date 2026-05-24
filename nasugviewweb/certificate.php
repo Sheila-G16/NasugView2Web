@@ -3,6 +3,9 @@ session_start();
 
 require_once __DIR__ . "/db.php";
 
+$smtpConfigFile = __DIR__ . "/smtp_config.php";
+$smtpConfig = is_file($smtpConfigFile) ? require $smtpConfigFile : [];
+
 $admin_fullname = "User";
 $designation = "Admin";
 
@@ -19,11 +22,370 @@ if (isset($_SESSION['user_id'])) {
     }
 }
 
+function formatCertificateEventDate($start, $end) {
+    if (empty($start)) {
+        return 'Month Day, Year';
+    }
+
+    $startTime = strtotime($start);
+    $endTime = !empty($end) ? strtotime($end) : null;
+
+    if (!$startTime) {
+        return 'Month Day, Year';
+    }
+
+    if ($endTime && date('Y-m-d', $startTime) !== date('Y-m-d', $endTime)) {
+        return date('F j, Y', $startTime) . ' to ' . date('F j, Y', $endTime);
+    }
+
+    return date('F j, Y', $startTime);
+}
+
+function smtpReadResponse($socket) {
+    $response = '';
+
+    while (($line = fgets($socket, 515)) !== false) {
+        $response .= $line;
+        if (strlen($line) >= 4 && $line[3] === ' ') {
+            break;
+        }
+    }
+
+    return $response;
+}
+
+function smtpCommand($socket, $command, $expectedCodes) {
+    fwrite($socket, $command . "\r\n");
+    $response = smtpReadResponse($socket);
+    $code = (int) substr($response, 0, 3);
+
+    if (!in_array($code, (array) $expectedCodes, true)) {
+        throw new RuntimeException('SMTP error: ' . trim($response));
+    }
+
+    return $response;
+}
+
+function smtpSendMessage($config, $toEmail, $rawMessage) {
+    if (empty($config['enabled'])) {
+        throw new RuntimeException('SMTP is not enabled. Open smtp_config.php, fill in the account settings, then set enabled to true.');
+    }
+
+    $host = trim((string) ($config['host'] ?? ''));
+    $port = (int) ($config['port'] ?? 587);
+    $encryption = strtolower(trim((string) ($config['encryption'] ?? 'tls')));
+    $username = trim((string) ($config['username'] ?? ''));
+    $password = (string) ($config['password'] ?? '');
+    $fromEmail = trim((string) ($config['from_email'] ?? $username));
+
+    if ($host === '' || $port <= 0 || $fromEmail === '') {
+        throw new RuntimeException('SMTP host, port, and from_email are required in smtp_config.php.');
+    }
+
+    $target = $encryption === 'ssl' ? 'ssl://' . $host : $host;
+    $socket = fsockopen($target, $port, $errno, $errstr, 20);
+    if (!$socket) {
+        throw new RuntimeException('SMTP connection failed: ' . $errstr);
+    }
+
+    stream_set_timeout($socket, 20);
+
+    try {
+        $response = smtpReadResponse($socket);
+        if ((int) substr($response, 0, 3) !== 220) {
+            throw new RuntimeException('SMTP connection error: ' . trim($response));
+        }
+
+        smtpCommand($socket, 'EHLO localhost', 250);
+
+        if ($encryption === 'tls') {
+            smtpCommand($socket, 'STARTTLS', 220);
+            if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+                throw new RuntimeException('SMTP TLS negotiation failed.');
+            }
+            smtpCommand($socket, 'EHLO localhost', 250);
+        }
+
+        if ($username !== '' || $password !== '') {
+            smtpCommand($socket, 'AUTH LOGIN', 334);
+            smtpCommand($socket, base64_encode($username), 334);
+            smtpCommand($socket, base64_encode($password), 235);
+        }
+
+        smtpCommand($socket, 'MAIL FROM:<' . $fromEmail . '>', 250);
+        smtpCommand($socket, 'RCPT TO:<' . $toEmail . '>', [250, 251]);
+        smtpCommand($socket, 'DATA', 354);
+
+        $message = preg_replace('/^\./m', '..', $rawMessage);
+        fwrite($socket, $message . "\r\n.\r\n");
+        $response = smtpReadResponse($socket);
+        $code = (int) substr($response, 0, 3);
+        if (!in_array($code, [250, 251], true)) {
+            throw new RuntimeException('SMTP send error: ' . trim($response));
+        }
+
+        smtpCommand($socket, 'QUIT', 221);
+    } finally {
+        fclose($socket);
+    }
+}
+
+function sendCertificateEmail($toEmail, $toName, $certificateImage, $templateName, $eventTitle, $smtpConfig) {
+    $toEmail = trim((string) $toEmail);
+    $toName = trim((string) $toName);
+
+    if (!filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+        return ['sent' => false, 'message' => 'The selected participant does not have a valid email address.'];
+    }
+
+    if (strpos($certificateImage, 'data:image/png;base64,') !== 0) {
+        return ['sent' => false, 'message' => 'Certificate image is missing or invalid.'];
+    }
+
+    $imageData = base64_decode(substr($certificateImage, strlen('data:image/png;base64,')), true);
+    if ($imageData === false || $imageData === '') {
+        return ['sent' => false, 'message' => 'Certificate image could not be prepared.'];
+    }
+
+    if (empty($smtpConfig['enabled'])) {
+        return ['sent' => false, 'message' => 'SMTP is not enabled. Open smtp_config.php, fill in the email account settings, then set enabled to true.'];
+    }
+
+    $safeTemplateName = preg_replace('/[^a-zA-Z0-9_-]+/', '-', trim((string) $templateName));
+    $safeTemplateName = trim($safeTemplateName, '-') ?: 'certificate';
+    $filename = $safeTemplateName . '.png';
+    $boundary = 'certificate_' . bin2hex(random_bytes(12));
+    $subject = 'Certificate of Participation';
+    $displayName = $toName !== '' ? $toName : 'Participant';
+    $eventText = trim((string) $eventTitle) !== '' ? ' for ' . trim((string) $eventTitle) : '';
+
+    $message = "--{$boundary}\r\n";
+    $message .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    $message .= "Content-Transfer-Encoding: 7bit\r\n\r\n";
+    $message .= "Dear {$displayName},\r\n\r\n";
+    $message .= "Please find attached your Certificate of Participation{$eventText}.\r\n\r\n";
+    $message .= "Thank you.\r\n\r\n";
+    $message .= "--{$boundary}\r\n";
+    $message .= "Content-Type: image/png; name=\"{$filename}\"\r\n";
+    $message .= "Content-Transfer-Encoding: base64\r\n";
+    $message .= "Content-Disposition: attachment; filename=\"{$filename}\"\r\n\r\n";
+    $message .= chunk_split(base64_encode($imageData)) . "\r\n";
+    $message .= "--{$boundary}--";
+
+    $fromEmail = trim((string) ($smtpConfig['from_email'] ?? ($smtpConfig['username'] ?? '')));
+    $fromName = trim((string) ($smtpConfig['from_name'] ?? 'DTI Batangas')) ?: 'DTI Batangas';
+
+    if (!filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+        return ['sent' => false, 'message' => 'SMTP from_email is missing or invalid in smtp_config.php.'];
+    }
+
+    $headers = [
+        'From: ' . $fromName . ' <' . $fromEmail . '>',
+        'To: ' . $displayName . ' <' . $toEmail . '>',
+        'Subject: ' . $subject,
+        'MIME-Version: 1.0',
+        'Content-Type: multipart/mixed; boundary="' . $boundary . '"'
+    ];
+
+    try {
+        smtpSendMessage($smtpConfig, $toEmail, implode("\r\n", $headers) . "\r\n\r\n" . $message);
+        $sent = true;
+        $errorMessage = '';
+    } catch (Throwable $error) {
+        $sent = false;
+        $errorMessage = $error->getMessage();
+    }
+
+    return [
+        'sent' => $sent,
+        'message' => $sent
+            ? 'Certificate email sent to ' . $toEmail . '.'
+            : 'Email could not be sent. ' . $errorMessage
+    ];
+}
+
+$certificateRecipientName = '';
+$certificateRecipientEmail = '';
+$certificateEventTitle = 'Program Title';
+$certificateEventDate = 'Month Day, Year';
+$certificateEventVenue = 'Venue';
+$certificateTemplateName = 'certificate-design';
+
+$selectedEvaluationId = isset($_GET['evaluation_id']) ? (int) $_GET['evaluation_id'] : 0;
+$selectedCertificateEventCode = isset($_GET['event_code']) ? trim((string) $_GET['event_code']) : '';
+$certificateEventOptions = [];
+$certificateEventResult = $conn->query("
+    SELECT
+        ee.event_code,
+        COUNT(*) AS total_participants,
+        MAX(ee.created_at) AS last_evaluated_at,
+        e.title,
+        e.start_date_and_time,
+        e.end_date_and_time,
+        e.address
+    FROM event_evaluations ee
+    LEFT JOIN events e
+        ON e.id = ee.event_id
+    WHERE ee.event_code IS NOT NULL
+        AND TRIM(ee.event_code) <> ''
+    GROUP BY
+        ee.event_code,
+        e.title,
+        e.start_date_and_time,
+        e.end_date_and_time,
+        e.address
+    ORDER BY last_evaluated_at DESC, ee.event_code ASC
+");
+
+if ($certificateEventResult) {
+    while ($eventRow = $certificateEventResult->fetch_assoc()) {
+        $certificateEventOptions[] = $eventRow;
+    }
+}
+
+$validCertificateEventCodes = array_map(function ($eventRow) {
+    return (string) $eventRow['event_code'];
+}, $certificateEventOptions);
+
+if ($selectedCertificateEventCode === '' && $selectedEvaluationId <= 0 && !empty($validCertificateEventCodes)) {
+    $selectedCertificateEventCode = $validCertificateEventCodes[0];
+}
+
+if ($selectedCertificateEventCode !== '' && !in_array($selectedCertificateEventCode, $validCertificateEventCodes, true)) {
+    $selectedCertificateEventCode = $validCertificateEventCodes[0] ?? '';
+}
+
+$certificateQuery = "
+    SELECT
+        ee.id,
+        ee.full_name,
+        ee.email,
+        ee.event_code,
+        e.title,
+        e.start_date_and_time,
+        e.end_date_and_time,
+        e.address
+    FROM event_evaluations ee
+    LEFT JOIN events e
+        ON e.id = ee.event_id
+    WHERE 1 = 1
+";
+$certificateParams = [];
+$certificateTypes = '';
+$hasCertificateCriteria = false;
+
+if ($selectedEvaluationId > 0) {
+    $certificateQuery .= " AND ee.id = ?";
+    $certificateParams[] = $selectedEvaluationId;
+    $certificateTypes .= 'i';
+    $hasCertificateCriteria = true;
+} elseif ($selectedCertificateEventCode !== '') {
+    $certificateQuery .= " AND ee.event_code = ?";
+    $certificateParams[] = $selectedCertificateEventCode;
+    $certificateTypes .= 's';
+    $hasCertificateCriteria = true;
+} elseif (isset($_SESSION['user_id'])) {
+    $certificateQuery .= " AND ee.user_id = ?";
+    $certificateParams[] = (int) $_SESSION['user_id'];
+    $certificateTypes .= 'i';
+    $hasCertificateCriteria = true;
+}
+
+$certificateQuery .= " ORDER BY ee.created_at DESC, ee.id DESC LIMIT 1";
+$certificateStmt = $hasCertificateCriteria ? $conn->prepare($certificateQuery) : null;
+if ($certificateStmt) {
+    if (!empty($certificateParams)) {
+        $certificateStmt->bind_param($certificateTypes, ...$certificateParams);
+    }
+    $certificateStmt->execute();
+    $certificateResult = $certificateStmt->get_result();
+
+    if ($certificateRow = $certificateResult->fetch_assoc()) {
+        $certificateRecipientName = trim((string) ($certificateRow['full_name'] ?? ''));
+        $certificateRecipientEmail = trim((string) ($certificateRow['email'] ?? ''));
+        $certificateEventTitle = trim((string) ($certificateRow['title'] ?? '')) ?: 'Program Title';
+        $certificateEventDate = formatCertificateEventDate($certificateRow['start_date_and_time'] ?? '', $certificateRow['end_date_and_time'] ?? '');
+        $certificateEventVenue = trim((string) ($certificateRow['address'] ?? '')) ?: 'Venue';
+        $certificateTemplateName = trim((string) ($certificateRow['event_code'] ?? 'certificate')) . '-certificate';
+        $selectedEvaluationId = (int) ($certificateRow['id'] ?? $selectedEvaluationId);
+        if ($selectedCertificateEventCode === '') {
+            $selectedCertificateEventCode = trim((string) ($certificateRow['event_code'] ?? ''));
+        }
+    }
+
+    $certificateStmt->close();
+}
+
+$certificateParticipants = [];
+if ($selectedCertificateEventCode !== '') {
+    $participantStmt = $conn->prepare("
+        SELECT
+            id,
+            full_name,
+            email,
+            event_code
+        FROM event_evaluations
+        WHERE event_code = ?
+        ORDER BY full_name ASC, created_at DESC, id DESC
+    ");
+
+    if ($participantStmt) {
+        $participantStmt->bind_param("s", $selectedCertificateEventCode);
+        $participantStmt->execute();
+        $participantResult = $participantStmt->get_result();
+        while ($participantRow = $participantResult->fetch_assoc()) {
+            $participantName = trim((string) ($participantRow['full_name'] ?? ''));
+            $certificateParticipants[] = [
+                'id' => (int) $participantRow['id'],
+                'name' => $participantName !== '' ? $participantName : 'Participant ' . $participantRow['id'],
+                'email' => trim((string) ($participantRow['email'] ?? '')),
+                'event_code' => (string) $participantRow['event_code']
+            ];
+        }
+        $participantStmt->close();
+    }
+}
+
+$certificateBodyText = 'for participating in the program/activity entitled "' . $certificateEventTitle . '" held on ' . $certificateEventDate . ' at ' . $certificateEventVenue . '.';
+$certificateDefaults = [
+    'recipientName' => $certificateRecipientName,
+    'recipientEmail' => $certificateRecipientEmail,
+    'eventTitle' => $certificateEventTitle,
+    'eventDate' => $certificateEventDate,
+    'venue' => $certificateEventVenue,
+    'bodyText' => $certificateBodyText,
+    'signatoryName' => 'LEILA M. CABREROS',
+    'signatoryPosition' => "Provincial Director\nDTI Batangas",
+    'templateName' => $certificateTemplateName,
+    'selectedEventCode' => $selectedCertificateEventCode,
+    'selectedEvaluationId' => $selectedEvaluationId,
+    'events' => $certificateEventOptions,
+    'participants' => $certificateParticipants
+];
+
 $saveDir = __DIR__ . "/saved_templates/";
 $saveUrl = "saved_templates/";
 
 if (!is_dir($saveDir)) {
     mkdir($saveDir, 0777, true);
+}
+
+if (isset($_POST['send_certificate_email'])) {
+    $result = sendCertificateEmail(
+        $_POST['recipient_email'] ?? '',
+        $_POST['recipient_name'] ?? '',
+        $_POST['image'] ?? '',
+        $_POST['template_name'] ?? '',
+        $_POST['event_title'] ?? '',
+        $smtpConfig
+    );
+
+    header("Content-Type: application/json");
+    echo json_encode([
+        "status" => $result['sent'] ? "sent" : "error",
+        "message" => $result['message']
+    ]);
+    exit;
 }
 
 if (isset($_POST['save_layout'])) {
@@ -32,16 +394,26 @@ if (isset($_POST['save_layout'])) {
     $customName = trim($_POST['template_name'] ?? '');
     $safeName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $customName);
     $name = $safeName !== '' ? $safeName . "_" . time() : "template_" . time();
+    $layoutFile = $saveDir . $name . ".json";
+    $imageFile = $saveDir . $name . ".png";
+    $layoutSaved = file_put_contents($layoutFile, $layout) !== false;
+    $imageSaved = true;
 
-    file_put_contents($saveDir . $name . ".json", $layout);
-
-    if (strpos($image, 'data:image/png;base64,') === 0) {
+    if ($layoutSaved && strpos($image, 'data:image/png;base64,') === 0) {
         $image = str_replace('data:image/png;base64,', '', $image);
-        file_put_contents($saveDir . $name . ".png", base64_decode($image));
+        $imageSaved = file_put_contents($imageFile, base64_decode($image)) !== false;
     }
 
     header("Content-Type: application/json");
-    echo json_encode(["status" => "saved", "name" => $name]);
+    if ($layoutSaved && $imageSaved) {
+        echo json_encode(["status" => "saved", "name" => $name]);
+    } else {
+        http_response_code(500);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Template could not be saved. Please check the saved_templates folder permissions."
+        ]);
+    }
     exit;
 }
 
@@ -263,21 +635,29 @@ body.left-panel-hidden .main-content{
     min-height:74px;
     padding:10px;
     border-radius:8px;
-    background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
-    border:1px solid rgba(0,26,71,.08);
-    box-shadow:0 12px 24px rgba(0,26,71,.18);
-    color:#fff;
+    background:linear-gradient(180deg, #ffffff 0%, #f6f9fd 100%);
+    border:1px solid rgba(0,48,138,.22);
+    border-left:4px solid rgba(0,48,138,.56);
+    box-shadow:0 8px 18px rgba(0,26,71,.08);
+    color:var(--ink);
     text-align:left;
 }
 
 .tool-btn strong{
     font-size:12px;
+    color:var(--navy);
 }
 
 .tool-btn span{
     font-size:11px;
-    color:rgba(255,255,255,.8);
+    color:var(--muted);
     line-height:1.3;
+}
+
+.tool-btn:hover{
+    background:#eef5ff;
+    border-color:rgba(0,48,138,.36);
+    border-left-color:var(--navy-deep);
 }
 
 .tool-btn:hover,
@@ -337,9 +717,10 @@ body.left-panel-hidden .main-content{
     border-radius:8px;
     font-size:13px;
     font-weight:600;
-    background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
-    color:#fff;
-    box-shadow:0 10px 22px rgba(0,26,71,.16);
+    background:linear-gradient(180deg, #ffffff 0%, #f6f9fd 100%);
+    color:var(--navy);
+    border:1px solid rgba(0,48,138,.24);
+    box-shadow:0 8px 18px rgba(0,26,71,.08);
 }
 
 .action-btn i{
@@ -394,8 +775,9 @@ body.left-panel-hidden .main-content{
 }
 
 .action-btn.primary{
-    background:linear-gradient(135deg, var(--navy) 0%, var(--navy-deep) 100%);
-    color:#fff;
+    background:#eef5ff;
+    color:var(--navy);
+    border-color:rgba(0,48,138,.34);
 }
 
 .action-btn.gold{
@@ -488,6 +870,11 @@ body.left-panel-hidden .main-content{
 
 .toolbar-cluster input[type="text"]{
     width:140px;
+}
+
+.toolbar-cluster select{
+    width:190px;
+    max-width:100%;
 }
 
 .toolbar-cluster input[type="text"],
@@ -777,8 +1164,8 @@ body.left-panel-hidden .main-content{
     padding:12px 14px;
     border:1px dashed rgba(0,26,71,.15);
     border-radius:8px;
-    color:rgba(255,255,255,.88);
-    background:linear-gradient(135deg, rgba(0,26,71,.92) 0%, rgba(0,48,138,.92) 100%);
+    color:var(--muted);
+    background:#f8fbff;
     font-size:12px;
     line-height:1.5;
 }
@@ -793,8 +1180,8 @@ body.left-panel-hidden .main-content{
     width:100%;
     padding:8px;
     border-radius:8px;
-    background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
-    border:1px solid rgba(0,26,71,.08);
+    background:linear-gradient(180deg, #ffffff 0%, #f6f9fd 100%);
+    border:1px solid rgba(0,48,138,.18);
     text-align:left;
 }
 
@@ -820,12 +1207,12 @@ body.left-panel-hidden .main-content{
 .template-card strong{
     display:block;
     font-size:12px;
-    color:#fff;
+    color:var(--navy);
 }
 
 .template-card span{
     font-size:11px;
-    color:rgba(255,255,255,.8);
+    color:var(--muted);
 }
 
 .template-delete-btn{
@@ -867,8 +1254,9 @@ body.left-panel-hidden .main-content{
     gap:8px;
     padding:7px 10px;
     border-radius:999px;
-    background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
-    color:#fff;
+    background:#eef5ff;
+    border:1px solid rgba(0,48,138,.18);
+    color:var(--navy);
     font-size:12px;
     font-weight:600;
 }
@@ -918,7 +1306,7 @@ body.left-panel-hidden .main-content{
     appearance:none;
     height:8px;
     border-radius:999px;
-    background:linear-gradient(135deg, var(--navy) 0%, var(--navy-deep) 100%);
+    background:#dbeafe;
     outline:none;
 }
 
@@ -938,7 +1326,7 @@ body.left-panel-hidden .main-content{
     height:8px;
     border:none;
     border-radius:999px;
-    background:linear-gradient(135deg, var(--navy) 0%, var(--navy-deep) 100%);
+    background:#dbeafe;
 }
 
 .range-wrap input[type="range"]::-moz-range-thumb{
@@ -960,8 +1348,9 @@ body.left-panel-hidden .main-content{
 .align-btn{
     height:36px;
     border-radius:10px;
-    background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
-    color:#fff;
+    background:#ffffff;
+    border:1px solid rgba(0,48,138,.22);
+    color:var(--navy);
     font-weight:700;
     font-size:12px;
 }
@@ -1006,9 +1395,9 @@ body.left-panel-hidden .main-content{
     display:inline-flex;
     align-items:center;
     justify-content:center;
-    background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
-    border:1px solid var(--line);
-    color:#fff;
+    background:#eef5ff;
+    border:1px solid rgba(0,48,138,.22);
+    color:var(--navy);
     font-size:12px;
     font-weight:700;
     letter-spacing:.04em;
@@ -1040,8 +1429,9 @@ body.left-panel-hidden .main-content{
     padding:10px 12px;
     font-size:12px;
     font-weight:700;
-    background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
-    color:#fff;
+    background:#ffffff;
+    color:var(--navy);
+    border-bottom:1px solid rgba(0,48,138,.12);
 }
 
 .collapsible summary::-webkit-details-marker{
@@ -1051,7 +1441,7 @@ body.left-panel-hidden .main-content{
 .collapsible summary::after{
     content:"+";
     font-size:16px;
-    color:rgba(255,255,255,.78);
+    color:var(--navy-deep);
 }
 
 .collapsible[open] summary::after{
@@ -1081,8 +1471,9 @@ body.left-panel-hidden .main-content{
     min-width:42px;
     border:none;
     border-radius:8px;
-    background:linear-gradient(135deg, rgba(0,26,71,.94) 0%, rgba(0,48,138,.94) 100%);
-    color:#fff;
+    background:#ffffff;
+    border:1px solid rgba(0,48,138,.24);
+    color:var(--navy);
     display:inline-flex;
     align-items:center;
     justify-content:center;
@@ -1494,6 +1885,14 @@ body.exporting #canvas::before{
                     <summary>More Elements</summary>
                     <div class="collapsible-body">
                         <div class="tool-grid">
+                            <button class="tool-btn" data-add="logoDti">
+                                <strong>DTI Logo</strong>
+                                <span>Add official DTI mark</span>
+                            </button>
+                            <button class="tool-btn" data-add="logoNegosyo">
+                                <strong>Negosyo Logo</strong>
+                                <span>Add Negosyo Center mark</span>
+                            </button>
                             <button class="tool-btn" data-add="image">
                                 <strong>Image</strong>
                                 <span>Upload logo or seal</span>
@@ -1603,6 +2002,57 @@ body.exporting #canvas::before{
                 <div class="toolbar-cluster">
                     <label for="templateName">Template Name</label>
                     <input type="text" id="templateName" placeholder="My certificate layout">
+                </div>
+                <div class="toolbar-cluster">
+                    <label for="certificateEventSelect">Event</label>
+                    <select id="certificateEventSelect">
+                        <?php if (!empty($certificateEventOptions)): ?>
+                            <?php foreach ($certificateEventOptions as $eventOption): ?>
+                                <?php
+                                $optionCode = (string) $eventOption['event_code'];
+                                $optionLabel = $optionCode;
+                                if (!empty($eventOption['title'])) {
+                                    $optionLabel .= ' - ' . $eventOption['title'];
+                                }
+                                $optionDate = formatCertificateEventDate($eventOption['start_date_and_time'] ?? '', $eventOption['end_date_and_time'] ?? '');
+                                if ($optionDate !== 'Month Day, Year') {
+                                    $optionLabel .= ' (' . $optionDate . ')';
+                                }
+                                ?>
+                                <option value="<?php echo htmlspecialchars($optionCode); ?>" <?php echo $optionCode === $selectedCertificateEventCode ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($optionLabel); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <option value="">No evaluated events</option>
+                        <?php endif; ?>
+                    </select>
+                </div>
+                <div class="toolbar-cluster">
+                    <label for="certificateParticipantSelect">Participant</label>
+                    <select id="certificateParticipantSelect">
+                        <?php if (!empty($certificateParticipants)): ?>
+                            <?php foreach ($certificateParticipants as $participant): ?>
+                                <option value="<?php echo (int) $participant['id']; ?>" <?php echo (int) $participant['id'] === (int) $selectedEvaluationId ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($participant['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <option value="">No evaluated participants</option>
+                        <?php endif; ?>
+                    </select>
+                </div>
+                <div class="toolbar-cluster">
+                    <button class="action-btn" type="button" id="sendCertificateEmailBtn">
+                        <i class="fas fa-envelope" aria-hidden="true"></i>
+                        <span class="btn-text">Email</span>
+                        <span class="btn-tooltip">Send certificate to selected participant</span>
+                    </button>
+                    <button class="action-btn" type="button" id="downloadAllParticipantsBtn">
+                        <i class="fas fa-users" aria-hidden="true"></i>
+                        <span class="btn-text">All PDF</span>
+                        <span class="btn-tooltip">Download PDF for all participants</span>
+                    </button>
                 </div>
                 <div class="toolbar-cluster">
                     <label>Zoom</label>
@@ -1853,6 +2303,10 @@ const inspectorPanel = document.getElementById('inspectorPanel');
 const hideLeftPanelBtn = document.getElementById('hideLeftPanelBtn');
 const showLeftPanelBtn = document.getElementById('showLeftPanelBtn');
 const templateNameInput = document.getElementById('templateName');
+const certificateEventSelect = document.getElementById('certificateEventSelect');
+const certificateParticipantSelect = document.getElementById('certificateParticipantSelect');
+const downloadAllParticipantsBtn = document.getElementById('downloadAllParticipantsBtn');
+const sendCertificateEmailBtn = document.getElementById('sendCertificateEmailBtn');
 const imageInput = document.getElementById('imageInput');
 const backgroundInput = document.getElementById('backgroundInput');
 const selectionLabel = document.getElementById('selectionLabel');
@@ -1903,6 +2357,89 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2.5;
 const ZOOM_STEP = 0.1;
 const LEFT_PANEL_STORAGE_KEY = 'certificate_left_panel_hidden';
+const certificateDefaults = <?php echo json_encode($certificateDefaults, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+
+function escapeCertificateHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function getSelectedCertificateEvent() {
+    const eventCode = certificateEventSelect?.value || certificateDefaults.selectedEventCode || '';
+    return (certificateDefaults.events || []).find((event) => event.event_code === eventCode) || null;
+}
+
+function getSelectedCertificateParticipant() {
+    const participantId = certificateParticipantSelect?.value || String(certificateDefaults.selectedEvaluationId || '');
+    return (certificateDefaults.participants || []).find((item) => String(item.id) === String(participantId)) || null;
+}
+
+function formatCertificateDateForClient(eventData) {
+    if (!eventData?.start_date_and_time) {
+        return certificateDefaults.eventDate || 'Month Day, Year';
+    }
+
+    const start = new Date(String(eventData.start_date_and_time).replace(' ', 'T'));
+    const end = eventData.end_date_and_time ? new Date(String(eventData.end_date_and_time).replace(' ', 'T')) : null;
+    if (Number.isNaN(start.getTime())) {
+        return certificateDefaults.eventDate || 'Month Day, Year';
+    }
+
+    const formatDate = (date) => date.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+    });
+
+    if (end && !Number.isNaN(end.getTime()) && start.toDateString() !== end.toDateString()) {
+        return `${formatDate(start)} to ${formatDate(end)}`;
+    }
+
+    return formatDate(start);
+}
+
+function buildCertificateBody(eventData) {
+    const title = eventData?.title || certificateDefaults.eventTitle || 'Program Title';
+    const date = formatCertificateDateForClient(eventData);
+    const venue = eventData?.address || certificateDefaults.venue || 'Venue';
+    return `for participating in the program/activity entitled "${title}" held on ${date} at ${venue}.`;
+}
+
+function findCertificateItem(role) {
+    return canvas.querySelector(`.design-item[data-role="${role}"]`);
+}
+
+function setCertificateText(role, html) {
+    const item = findCertificateItem(role);
+    if (!item) {
+        return;
+    }
+
+    const content = item.querySelector('.item-content');
+    if (content) {
+        content.innerHTML = html || '&nbsp;';
+    }
+}
+
+function applyCertificateParticipant(participantName, shouldSave = true) {
+    const eventData = getSelectedCertificateEvent();
+    setCertificateText('recipient', participantName ? escapeCertificateHtml(participantName) : '&nbsp;');
+    setCertificateText('body', escapeCertificateHtml(buildCertificateBody(eventData)));
+
+    const eventCode = eventData?.event_code || certificateDefaults.selectedEventCode || 'certificate';
+    const nameSlug = String(participantName || 'participant')
+        .replace(/[^a-zA-Z0-9_-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    templateNameInput.value = `${eventCode}-${nameSlug || 'participant'}-certificate`;
+
+    if (shouldSave) {
+        saveHistory();
+    }
+}
 
 const presets = {
     logoDti: {
@@ -1927,14 +2464,14 @@ const presets = {
     },
     logoNegosyo: {
         type: 'image',
-        x: 562,
-        y: 78,
-        width: 158,
-        height: 54,
+        x: 544,
+        y: 12,
+        width: 210,
+        height: 210,
         rotation: 0,
         zIndex: 18,
         opacity: 1,
-        src: 'assets/negosyo-center.png',
+        src: 'assets/negosyo-center-transparent.png',
         html: '',
         styles: {
             backgroundColor: 'transparent',
@@ -1948,7 +2485,7 @@ const presets = {
     title: {
         type: 'text',
         x: 260,
-        y: 150,
+        y: 176,
         width: 604,
         height: 72,
         rotation: 0,
@@ -1970,7 +2507,7 @@ const presets = {
     subtitle: {
         type: 'text',
         x: 352,
-        y: 220,
+        y: 246,
         width: 420,
         height: 40,
         rotation: 0,
@@ -1991,6 +2528,7 @@ const presets = {
     },
     awardText: {
         type: 'text',
+        role: 'awardText',
         x: 342,
         y: 284,
         width: 440,
@@ -2013,6 +2551,7 @@ const presets = {
     },
     recipient: {
         type: 'text',
+        role: 'recipient',
         x: 322,
         y: 326,
         width: 480,
@@ -2020,7 +2559,7 @@ const presets = {
         rotation: 0,
         zIndex: 21,
         opacity: 1,
-        html: '&nbsp;',
+        html: certificateDefaults.recipientName ? escapeCertificateHtml(certificateDefaults.recipientName) : '&nbsp;',
         styles: {
             fontFamily: "'Montserrat', sans-serif",
             fontSize: '34px',
@@ -2035,6 +2574,7 @@ const presets = {
     },
     body: {
         type: 'text',
+        role: 'body',
         x: 180,
         y: 432,
         width: 764,
@@ -2042,7 +2582,7 @@ const presets = {
         rotation: 0,
         zIndex: 22,
         opacity: 1,
-        html: 'for participating in the program/activity entitled "Program Title" held on Month Day, Year at Venue. This paragraph may be edited by the user to describe the purpose and details of the certificate.',
+        html: escapeCertificateHtml(certificateDefaults.bodyText || 'for participating in the program/activity entitled "Program Title" held on Month Day, Year at Venue.'),
         styles: {
             fontFamily: "'Cormorant Garamond', serif",
             fontSize: '24px',
@@ -2056,23 +2596,18 @@ const presets = {
         }
     },
     signature: {
-        type: 'text',
-        x: 440,
-        y: 590,
-        width: 244,
-        height: 44,
+        type: 'shape',
+        x: 410,
+        y: 626,
+        width: 304,
+        height: 1,
         rotation: 0,
         zIndex: 23,
         opacity: 1,
-        html: 'Signatory',
+        html: '',
         styles: {
-            fontFamily: "'Great Vibes', cursive",
-            fontSize: '30px',
-            fontWeight: '400',
-            color: '#000000',
-            textAlign: 'center',
-            backgroundColor: 'transparent',
-            borderRadius: '0px',
+            backgroundColor: '#000000',
+            borderRadius: '999px',
             borderWidth: '0px',
             borderColor: '#000000'
         }
@@ -2086,10 +2621,10 @@ const presets = {
         rotation: 0,
         zIndex: 23,
         opacity: 1,
-        html: 'NAME OF SIGNATORY',
+        html: certificateDefaults.signatoryName ? escapeCertificateHtml(certificateDefaults.signatoryName) : 'Signatory Name',
         styles: {
             fontFamily: "'Cormorant Garamond', serif",
-            fontSize: '20px',
+            fontSize: '24px',
             fontWeight: '700',
             color: '#000000',
             textAlign: 'center',
@@ -2108,7 +2643,7 @@ const presets = {
         rotation: 0,
         zIndex: 23,
         opacity: 1,
-        html: 'Position',
+        html: certificateDefaults.signatoryPosition ? escapeCertificateHtml(certificateDefaults.signatoryPosition) : 'Position',
         styles: {
             fontFamily: "'Cormorant Garamond', serif",
             fontSize: '16px',
@@ -2380,6 +2915,9 @@ function createItem(data, shouldSave = true) {
     item.className = `design-item item-${data.type}`;
     item.dataset.id = data.id || uid();
     item.dataset.type = data.type;
+    if (data.role) {
+        item.dataset.role = data.role;
+    }
     item.dataset.rotation = data.rotation || 0;
     item.dataset.lockedFill = data.lockedFill ? '1' : '0';
     const locked = data.locked === true || data.locked === '1';
@@ -2790,6 +3328,7 @@ function serializeLayout() {
             const payload = {
                 id: item.dataset.id,
                 type: item.dataset.type,
+                role: item.dataset.role || '',
                 x: parseFloat(item.style.left || 0),
                 y: parseFloat(item.style.top || 0),
                 width: parseFloat(item.style.width || 0),
@@ -3105,8 +3644,14 @@ function saveTemplate() {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: params.toString()
         });
-    }).then((response) => response.json())
-      .then(() => window.location.reload())
+    }).then((response) => response.json().then((result) => {
+        if (!response.ok || result.status !== 'saved') {
+            throw new Error(result.message || 'Template could not be saved.');
+        }
+
+        window.location.reload();
+    }))
+      .catch((error) => alert(error.message || 'Template could not be saved.'))
       .finally(() => document.body.classList.remove('exporting'));
 }
 
@@ -3160,6 +3705,126 @@ function downloadPDF() {
         );
         pdf.save(getExportFilename('pdf'));
     });
+}
+
+function sendCertificateEmail() {
+    const participant = getSelectedCertificateParticipant();
+    const recipientName = participant?.name || certificateDefaults.recipientName || '';
+    const recipientEmail = participant?.email || certificateDefaults.recipientEmail || '';
+
+    if (!recipientEmail) {
+        alert('The selected participant does not have an email address.');
+        return;
+    }
+
+    if (!confirm(`Send this certificate to ${recipientName || 'the selected participant'} at ${recipientEmail}?`)) {
+        return;
+    }
+
+    const originalButtonText = sendCertificateEmailBtn.querySelector('.btn-text')?.textContent || 'Email';
+    sendCertificateEmailBtn.disabled = true;
+    sendCertificateEmailBtn.querySelector('.btn-text').textContent = 'Sending';
+
+    renderCanvasForExport()
+        .then((result) => {
+            const params = new URLSearchParams();
+            params.set('send_certificate_email', '1');
+            params.set('recipient_name', recipientName);
+            params.set('recipient_email', recipientEmail);
+            params.set('event_title', getSelectedCertificateEvent()?.title || certificateDefaults.eventTitle || '');
+            params.set('template_name', templateNameInput.value.trim());
+            params.set('image', result.toDataURL('image/png'));
+
+            return fetch('', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString()
+            });
+        })
+        .then((response) => response.text())
+        .then((text) => {
+            try {
+                return JSON.parse(text);
+            } catch (error) {
+                throw new Error('Email server returned an invalid response. Please check PHP mail/SMTP settings.');
+            }
+        })
+        .then((result) => {
+            alert(result.message || (result.status === 'sent' ? 'Certificate email sent.' : 'Certificate email could not be sent.'));
+        })
+        .catch((error) => {
+            alert(error.message || 'Certificate email could not be sent. Please try again.');
+        })
+        .finally(() => {
+            sendCertificateEmailBtn.disabled = false;
+            sendCertificateEmailBtn.querySelector('.btn-text').textContent = originalButtonText;
+        });
+}
+
+async function downloadAllParticipantsPDF() {
+    if (!window.jspdf?.jsPDF) {
+        alert('PDF export is still loading. Please try again in a moment.');
+        return;
+    }
+
+    const participants = certificateDefaults.participants || [];
+    if (!participants.length) {
+        alert('No evaluated participants found for this event.');
+        return;
+    }
+
+    const recipientItem = findCertificateItem('recipient');
+    const bodyItem = findCertificateItem('body');
+    const originalRecipient = recipientItem?.querySelector('.item-content')?.innerHTML || '';
+    const originalBody = bodyItem?.querySelector('.item-content')?.innerHTML || '';
+    const originalTemplateName = templateNameInput.value;
+    const originalSelectedParticipant = certificateParticipantSelect?.value || '';
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [BASE_CANVAS_WIDTH, BASE_CANVAS_HEIGHT]
+    });
+
+    downloadAllParticipantsBtn.disabled = true;
+    downloadAllParticipantsBtn.querySelector('.btn-text').textContent = 'Building';
+
+    try {
+        for (let index = 0; index < participants.length; index++) {
+            const participant = participants[index];
+            applyCertificateParticipant(participant.name, false);
+
+            if (certificateParticipantSelect) {
+                certificateParticipantSelect.value = String(participant.id);
+            }
+
+            const result = await renderCanvasForExport();
+            if (index > 0) {
+                pdf.addPage([BASE_CANVAS_WIDTH, BASE_CANVAS_HEIGHT], 'landscape');
+            }
+
+            pdf.addImage(
+                result.toDataURL('image/png'),
+                'PNG',
+                0,
+                0,
+                BASE_CANVAS_WIDTH,
+                BASE_CANVAS_HEIGHT
+            );
+        }
+
+        const eventCode = certificateEventSelect?.value || certificateDefaults.selectedEventCode || 'event';
+        pdf.save(`${eventCode}-all-participants-certificates.pdf`);
+    } finally {
+        setCertificateText('recipient', originalRecipient || '&nbsp;');
+        setCertificateText('body', originalBody || '&nbsp;');
+        templateNameInput.value = originalTemplateName;
+        if (certificateParticipantSelect) {
+            certificateParticipantSelect.value = originalSelectedParticipant;
+        }
+        downloadAllParticipantsBtn.disabled = false;
+        downloadAllParticipantsBtn.querySelector('.btn-text').textContent = 'All PDF';
+    }
 }
 
 function setDownloadMenuOpen(open) {
@@ -3220,6 +3885,18 @@ document.getElementById('deleteBtn').addEventListener('click', deleteSelected);
 document.getElementById('lockBtn').addEventListener('click', () => setSelectedLocked(true));
 document.getElementById('unlockBtn').addEventListener('click', () => setSelectedLocked(false));
 document.getElementById('saveBtn').addEventListener('click', saveTemplate);
+certificateEventSelect?.addEventListener('change', () => {
+    const eventCode = certificateEventSelect.value;
+    window.location.href = `${window.location.pathname}${eventCode ? `?event_code=${encodeURIComponent(eventCode)}` : ''}`;
+});
+certificateParticipantSelect?.addEventListener('change', () => {
+    const participant = (certificateDefaults.participants || []).find((item) => String(item.id) === certificateParticipantSelect.value);
+    if (participant) {
+        applyCertificateParticipant(participant.name);
+    }
+});
+sendCertificateEmailBtn?.addEventListener('click', sendCertificateEmail);
+downloadAllParticipantsBtn?.addEventListener('click', downloadAllParticipantsPDF);
 downloadBtn.addEventListener('click', toggleDownloadMenu);
 downloadMenu.addEventListener('click', (event) => {
     const format = event.target.closest('[data-download-format]')?.dataset.downloadFormat;
@@ -3563,6 +4240,10 @@ restoreLayout({
         }
     ]
 }, false);
+
+if (certificateDefaults.templateName) {
+    templateNameInput.value = certificateDefaults.templateName;
+}
 
 saveHistory();
 setLeftPanelHidden(localStorage.getItem(LEFT_PANEL_STORAGE_KEY) === '1');
