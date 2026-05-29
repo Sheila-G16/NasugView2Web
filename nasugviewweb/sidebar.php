@@ -8,6 +8,109 @@
 $admin_fullname = $admin_fullname ?? "User";
 $designation    = $designation    ?? "Admin";
 $current_page   = basename($_SERVER['PHP_SELF']);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+require_once __DIR__ . "/negosyo_notifications_helper.php";
+
+if (!function_exists('nasugviewweb_sidebar_initials')) {
+    function nasugviewweb_sidebar_initials(string $name): string
+    {
+        $parts = preg_split('/\s+/', trim($name));
+        $initials = '';
+
+        foreach ($parts as $part) {
+            if ($part !== '') {
+                $initials .= strtoupper(substr($part, 0, 1));
+            }
+
+            if (strlen($initials) >= 2) {
+                break;
+            }
+        }
+
+        return $initials !== '' ? $initials : 'U';
+    }
+}
+
+if (!function_exists('nasugviewweb_sidebar_profile_src')) {
+    function nasugviewweb_sidebar_profile_src(string $image, string $baseDir): string
+    {
+        $image = trim($image);
+
+        if ($image === '') {
+            return '';
+        }
+
+        $cleanImage = ltrim(str_replace('\\', '/', $image), '/');
+        $candidates = [
+            $cleanImage,
+            'uploads/' . basename($cleanImage)
+        ];
+
+        foreach (array_unique($candidates) as $candidate) {
+            if (is_file($baseDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $candidate))) {
+                return $candidate;
+            }
+        }
+
+        return '';
+    }
+}
+
+$sidebar_profile_image = $sidebar_profile_image ?? ($admin['profile_img'] ?? '');
+
+if (isset($_SESSION['user_id'])) {
+    $sidebar_conn = null;
+
+    if (isset($conn) && $conn instanceof mysqli) {
+        try {
+            $conn->query("DO 1");
+            $sidebar_conn = $conn;
+        } catch (Throwable $e) {
+            $sidebar_conn = null;
+        }
+    }
+
+    if (!$sidebar_conn) {
+        require __DIR__ . "/db.php";
+        $sidebar_conn = $conn;
+    }
+
+    if ($sidebar_conn instanceof mysqli) {
+        $stmt = $sidebar_conn->prepare("SELECT username, fname, lname, designation, profile_img FROM negosyo_center_users WHERE id=? LIMIT 1");
+
+        if ($stmt) {
+            $stmt->bind_param("i", $_SESSION['user_id']);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($row = $result->fetch_assoc()) {
+                $fname = trim($row['fname'] ?? '');
+                $lname = trim($row['lname'] ?? '');
+                $username = trim($row['username'] ?? '');
+
+                $admin_fullname = ($fname !== '' || $lname !== '')
+                    ? trim($fname . ' ' . $lname)
+                    : ($username !== '' ? $username : $admin_fullname);
+                $designation = trim($row['designation'] ?? '') ?: $designation;
+                $sidebar_profile_image = trim($row['profile_img'] ?? '') ?: $sidebar_profile_image;
+            }
+
+            $stmt->close();
+        }
+    }
+}
+
+$sidebar_profile_src = nasugviewweb_sidebar_profile_src($sidebar_profile_image, __DIR__);
+$sidebar_initials = nasugviewweb_sidebar_initials($admin_fullname);
+$sidebar_notification_count = 0;
+
+if (isset($_SESSION['user_id']) && isset($sidebar_conn) && $sidebar_conn instanceof mysqli) {
+    $sidebar_notification_count = nasugviewweb_unread_notification_count($sidebar_conn, (int) $_SESSION['user_id']);
+}
 ?>
 
 <!-- Fonts & Icons -->
@@ -25,7 +128,13 @@ $current_page   = basename($_SERVER['PHP_SELF']);
     <div class="sidebar-header">
 
         <div class="logo">
-            <img src="assets/nasugviewlogoblue.png" alt="NasugView Logo" class="logo-img">
+            <?php if ($sidebar_profile_src !== ''): ?>
+                <img src="<?php echo htmlspecialchars($sidebar_profile_src); ?>" alt="<?php echo htmlspecialchars($admin_fullname); ?> profile photo" class="profile-photo">
+            <?php else: ?>
+                <div class="profile-photo profile-photo-fallback" aria-label="<?php echo htmlspecialchars($admin_fullname); ?> profile photo">
+                    <?php echo htmlspecialchars($sidebar_initials); ?>
+                </div>
+            <?php endif; ?>
         </div>
 
         <div class="user-info">
@@ -59,6 +168,15 @@ $current_page   = basename($_SERVER['PHP_SELF']);
             <li>
                 <a href="businesses.php" class="<?php echo $current_page=='businesses.php'?'active':''; ?>">
                     <i class="fas fa-briefcase"></i> Businesses
+                </a>
+            </li>
+
+            <li>
+                <a href="notifications.php" class="<?php echo $current_page=='notifications.php'?'active':''; ?>">
+                    <i class="fas fa-bell"></i> Notifications
+                    <?php if ($sidebar_notification_count > 0): ?>
+                        <span class="sidebar-badge"><?php echo $sidebar_notification_count > 99 ? '99+' : (int) $sidebar_notification_count; ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
 
@@ -108,7 +226,7 @@ body, .sidebar, .sidebar a, .user-info {
 
 /* Header */
 .sidebar-header {
-    background: linear-gradient(to bottom, #ffffff 0%, #ffffff 0%, #001a47 100%);
+    background: #002565;
     padding: 2.5rem 1.5rem 2rem;  /* <-- Reduced top padding to match other pages */
     position: sticky;
     top: 0;
@@ -118,7 +236,7 @@ body, .sidebar, .sidebar a, .user-info {
     align-items: center;
 }
 
-/* Logo */
+/* Profile Photo */
 .logo {
     display:flex;
     justify-content:center;
@@ -126,8 +244,25 @@ body, .sidebar, .sidebar a, .user-info {
     margin-bottom:1rem;  /* <-- smaller margin */
 }
 
-.logo-img {
-    width:150px;
+.profile-photo {
+    width:104px;
+    height:104px;
+    border-radius:50%;
+    object-fit:cover;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:4px solid rgba(255,255,255,0.88);
+    box-shadow:0 14px 28px rgba(0,26,71,0.28);
+    background:#fff;
+}
+
+.profile-photo-fallback {
+    background:linear-gradient(135deg,#5b8be0,#001a47);
+    color:#fff;
+    font-size:34px;
+    font-weight:700;
+    letter-spacing:0;
 }
 
 /* User Info */
@@ -162,6 +297,7 @@ body, .sidebar, .sidebar a, .user-info {
 .sidebar-menu ul li a {
     display:flex;
     align-items:center;
+    position:relative;
     padding:1rem 1.5rem;
     margin:0.25rem 0;
     color:rgba(255,255,255,0.85);
@@ -192,6 +328,20 @@ body, .sidebar, .sidebar a, .user-info {
 
 body.sidebar-open {
     overflow:hidden;
+}
+
+.sidebar-badge {
+    margin-left:auto;
+    min-width:22px;
+    height:22px;
+    padding:0 6px;
+    border-radius:999px;
+    background:#dc3545;
+    color:#fff;
+    font-size:.72rem;
+    font-weight:700;
+    line-height:22px;
+    text-align:center;
 }
 
 .mobile-sidebar-toggle {
@@ -249,8 +399,9 @@ body.sidebar-open {
         padding:2rem 1rem 1.5rem;
     }
 
-    .logo-img {
-        width:130px;
+    .profile-photo {
+        width:92px;
+        height:92px;
     }
 
     .sidebar-menu ul li a {

@@ -3,6 +3,13 @@ session_start();
 
 require_once __DIR__ . "/db.php";
 
+if (!isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit();
+}
+
+$created_by_user_id = (int) $_SESSION['user_id'];
+
 function buildEventCode($eventId) {
     return "EVT" . str_pad((string)$eventId, 4, "0", STR_PAD_LEFT);
 }
@@ -21,11 +28,8 @@ function saveEventCode($conn, $eventId) {
 // ==============================
 $success = $error = "";
 
-// Business Owners form fields
+// Event form fields
 $title = $mode = $google_meet_link = $start_date = $end_date = $speaker = $budget = $address = $audience = $funding = $description = "";
-
-// Consumers form fields
-$c_title = $c_start_date = $c_end_date = $c_description = $c_address = "";
 
 // ==============================
 // Handle form submission
@@ -33,10 +37,7 @@ $c_title = $c_start_date = $c_end_date = $c_description = $c_address = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $created_at = date("Y-m-d H:i:s"); // current date and time
 
-    if(isset($_POST['form_type']) && $_POST['form_type'] == 'business') {
-        // ==============================
-        // Business Owners Form
-        // ==============================
+    if(isset($_POST['form_type']) && $_POST['form_type'] == 'event') {
         $title       = $conn->real_escape_string($_POST['title']);
         $mode        = $conn->real_escape_string($_POST['mode']);
         $google_meet_link = $conn->real_escape_string(trim($_POST['google_meet_link'] ?? ''));
@@ -56,74 +57,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $start_dt = new DateTime($start_date);
             $end_dt   = new DateTime($end_date);
-            $interval = $start_dt->diff($end_dt);
 
-            if ($interval->days > 0) {
-                $hours = $interval->h;
-                $duration = $interval->days . " day" . ($interval->days > 1 ? "s" : "");
-                if ($hours > 0) $duration .= " " . $hours . " hr" . ($hours > 1 ? "s" : "");
+            if ($end_dt <= $start_dt) {
+                $error = "End date and time must be later than the start date and time.";
             } else {
-                $duration = $interval->h . " hr" . ($interval->h > 1 ? "s" : "") . " " . $interval->i . " min";
+                $interval = $start_dt->diff($end_dt);
+
+                if ($interval->days > 0) {
+                    $hours = $interval->h;
+                    $duration = $interval->days . " day" . ($interval->days > 1 ? "s" : "");
+                    if ($hours > 0) $duration .= " " . $hours . " hr" . ($hours > 1 ? "s" : "");
+                } else {
+                    $duration = $interval->h . " hr" . ($interval->h > 1 ? "s" : "") . " " . $interval->i . " min";
+                }
+
+                $now = new DateTime();
+                if ($now < $start_dt) { $status = "For Implementation"; $remarks = "For Future"; }
+                elseif ($now >= $start_dt && $now <= $end_dt) { $status = "Ongoing"; $remarks = "In Progress"; }
+                else { $status = "Implemented"; $remarks = "Done"; }
+
+                $stmt = $conn->prepare("
+                    INSERT INTO events
+                    (event_code, created_by_user_id, title, mode_of_delivery, google_meet_link, start_date_and_time, end_date_and_time, speaker, budget, address, audience, funding_source, description, duration, status, remarks, created_at)
+                    VALUES ('PENDING', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->bind_param(
+                    "isssssssssssssss",
+                    $created_by_user_id, $title, $mode, $google_meet_link, $start_date, $end_date, $speaker, $budget,
+                    $address, $audience, $funding, $description, $duration, $status, $remarks, $created_at
+                );
+
+                if ($stmt->execute()) {
+                    saveEventCode($conn, $stmt->insert_id);
+                    $success = "Event created successfully!";
+                    $title = $mode = $google_meet_link = $start_date = $end_date = $speaker = $budget = $address = $audience = $funding = $description = "";
+                } else {
+                    $error = "Error creating event: " . $stmt->error;
+                }
+                $stmt->close();
             }
-
-            $now = new DateTime();
-            if ($now < $start_dt) { $status = "For Implementation"; $remarks = "For Future"; }
-            elseif ($now >= $start_dt && $now <= $end_dt) { $status = "Ongoing"; $remarks = "In Progress"; }
-            else { $status = "Implemented"; $remarks = "Done"; }
-
-            $stmt = $conn->prepare("
-                INSERT INTO events
-                (event_code, title, mode_of_delivery, google_meet_link, start_date_and_time, end_date_and_time, speaker, budget, address, audience, funding_source, description, duration, status, remarks, created_at)
-                VALUES ('PENDING', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->bind_param(
-                "sssssssssssssss",
-                $title, $mode, $google_meet_link, $start_date, $end_date, $speaker, $budget,
-                $address, $audience, $funding, $description, $duration, $status, $remarks, $created_at
-            );
-
-            if ($stmt->execute()) {
-                saveEventCode($conn, $stmt->insert_id);
-                $success = "Event for Business Owners created successfully!";
-                $title = $mode = $google_meet_link = $start_date = $end_date = $speaker = $budget = $address = $audience = $funding = $description = "";
-            } else {
-                $error = "Error creating event: " . $stmt->error;
-            }
-            $stmt->close();
         } else {
-            $error = "Please fill all required fields for Business Owners form.";
-        }
-
-    } elseif(isset($_POST['form_type']) && $_POST['form_type'] == 'consumer') {
-        // ==============================
-        // Consumers Form
-        // ==============================
-        $c_title       = $conn->real_escape_string($_POST['c_title']);
-        $c_start_date  = $conn->real_escape_string($_POST['c_start_date']);
-        $c_end_date    = $conn->real_escape_string($_POST['c_end_date']);
-        $c_description = $conn->real_escape_string($_POST['c_description']);
-        $c_address     = $conn->real_escape_string($_POST['c_address']);
-
-        if ($c_title && $c_start_date && $c_end_date) {
-            $stmt = $conn->prepare("
-                INSERT INTO events
-                (event_code, title, start_date_and_time, end_date_and_time, address, description, duration, status, remarks, google_meet_link, created_at)
-                VALUES ('PENDING', ?, ?, ?, ?, ?, '', 'For Implementation', '', '', ?)
-            ");
-            $stmt->bind_param(
-                "ssssss",
-                $c_title, $c_start_date, $c_end_date, $c_address, $c_description, $created_at
-            );
-            if ($stmt->execute()) {
-                saveEventCode($conn, $stmt->insert_id);
-                $success = "Event for Consumers created successfully!";
-                $c_title = $c_start_date = $c_end_date = $c_description = $c_address = "";
-            } else {
-                $error = "Error creating event for Consumers: " . $stmt->error;
-            }
-            $stmt->close();
-        } else {
-            $error = "Please fill all required fields for Consumers form.";
+            $error = "Please fill all required fields.";
         }
     }
 }
@@ -148,6 +122,17 @@ body { background-color: #f0f4ff; font-family: 'Poppins', sans-serif; padding: 3
 .form-control, .form-select, textarea { border-radius: 10px; border:1px solid #d6e4ff; box-shadow: 0 0 0 3px rgba(0,26,71,0.08); height:44px; padding: 8px 10px; }
 textarea.form-control { height:120px; resize:none; }
 .form-control:focus, .form-select:focus, textarea:focus { border-color: #001a47 !important; box-shadow: 0 0 0 4px rgba(0,26,71,0.25) !important; }
+.schedule-helper { background:#f8fbff; border:1px solid #d6e4ff; border-radius:10px; padding:1rem; margin:-.35rem 0 1rem; }
+.schedule-helper-title { color:#001a47; font-weight:700; font-size:.95rem; margin-bottom:.75rem; }
+.quick-date-buttons { display:flex; flex-wrap:wrap; gap:.5rem; }
+.quick-date-btn { border:1px solid rgba(0,26,71,.18); background:#fff; color:#001a47; border-radius:8px; padding:.5rem .75rem; font-weight:600; }
+.quick-date-btn:hover { background:#eaf1ff; }
+.datetime-builder { display:grid; grid-template-columns:1.35fr .72fr .72fr .8fr; gap:.5rem; }
+.datetime-builder input,
+.datetime-builder select { box-shadow:0 0 0 3px rgba(0,26,71,0.08); }
+.datetime-builder input[type="number"] { text-align:center; }
+.schedule-helper .form-select { box-shadow:none; }
+.schedule-note { margin:.6rem 0 0; color:#64748b; font-size:.88rem; }
 .btn-submit { background: linear-gradient(135deg,#001a47,#00308a) !important; color:#fff !important; border-radius:10px; padding:10px 24px; font-weight:600; border:none; box-shadow:0 10px 22px rgba(0,26,71,0.18); }
 .btn-submit:hover { background: linear-gradient(135deg,#00308a,#001a47) !important; color:#fff !important; transform:translateY(-2px); box-shadow:0 14px 28px rgba(0,26,71,0.24); }
 .btn-secondary { background: linear-gradient(135deg,#001a47,#00308a); border-radius:10px; padding:10px 22px; border:none; color:#fff; box-shadow:0 10px 22px rgba(0,26,71,0.18); }
@@ -177,11 +162,6 @@ textarea.form-control { height:120px; resize:none; }
         font-size:1.35rem;
     }
 
-    .nav-tabs .nav-link {
-        white-space:normal;
-        text-align:center;
-    }
-
     .mt-3 .btn {
         width:100%;
         margin-left:0 !important;
@@ -198,21 +178,8 @@ textarea.form-control { height:120px; resize:none; }
     <?php if($success): ?><div class="alert alert-success"><?php echo $success; ?></div><?php endif; ?>
     <?php if($error): ?><div class="alert alert-danger"><?php echo $error; ?></div><?php endif; ?>
 
-    <!-- Tabs -->
-    <ul class="nav nav-tabs mb-3" id="eventTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="business-tab" data-bs-toggle="tab" data-bs-target="#business" type="button" role="tab">For Business Owners</button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="consumer-tab" data-bs-toggle="tab" data-bs-target="#consumer" type="button" role="tab">For Consumers</button>
-        </li>
-    </ul>
-
-    <div class="tab-content">
-        <!-- Business Owners Form -->
-        <div class="tab-pane fade show active" id="business" role="tabpanel">
             <form method="POST">
-                <input type="hidden" name="form_type" value="business">
+                <input type="hidden" name="form_type" value="event">
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label">Title <span class="text-danger">*</span></label>
@@ -224,6 +191,7 @@ textarea.form-control { height:120px; resize:none; }
                             <option value="">Select Mode</option>
                             <option value="Seminar" <?php echo ($mode=="Seminar")?"selected":""; ?>>Seminar</option>
                             <option value="Webinar" <?php echo ($mode=="Webinar")?"selected":""; ?>>Webinar</option>
+                            <option value="Public Event" <?php echo ($mode=="Public Event")?"selected":""; ?>>Public Event</option>
                         </select>
                     </div>
                     <div class="col-12" id="googleMeetLinkGroup" style="display:none;">
@@ -232,11 +200,55 @@ textarea.form-control { height:120px; resize:none; }
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Start Date & Time <span class="text-danger">*</span></label>
-                        <input type="datetime-local" name="start_date" class="form-control" value="<?php echo $start_date; ?>" required>
+                        <input type="hidden" name="start_date" id="eventStartDate" class="schedule-start" value="<?php echo htmlspecialchars($start_date); ?>" required>
+                        <div class="datetime-builder" data-target="eventStartDate">
+                            <input type="date" class="form-control date-part" required>
+                            <input type="number" class="form-control hour-part" min="1" max="12" placeholder="HH" required>
+                            <input type="number" class="form-control minute-part" min="0" max="59" step="5" placeholder="MM" required>
+                            <select class="form-select ampm-part" required>
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">End Date & Time <span class="text-danger">*</span></label>
-                        <input type="datetime-local" name="end_date" class="form-control" value="<?php echo $end_date; ?>" required>
+                        <input type="hidden" name="end_date" id="eventEndDate" class="schedule-end" value="<?php echo htmlspecialchars($end_date); ?>" required>
+                        <div class="datetime-builder" data-target="eventEndDate">
+                            <input type="date" class="form-control date-part" required>
+                            <input type="number" class="form-control hour-part" min="1" max="12" placeholder="HH" required>
+                            <input type="number" class="form-control minute-part" min="0" max="59" step="5" placeholder="MM" required>
+                            <select class="form-select ampm-part" required>
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="schedule-helper" data-start="eventStartDate" data-end="eventEndDate">
+                            <div class="schedule-helper-title"><i class="fas fa-clock me-2"></i>Quick schedule setup</div>
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-7">
+                                    <label class="form-label small mb-1">Quick date</label>
+                                    <div class="quick-date-buttons">
+                                        <button type="button" class="quick-date-btn" data-offset-days="0">Today</button>
+                                        <button type="button" class="quick-date-btn" data-offset-days="1">Tomorrow</button>
+                                        <button type="button" class="quick-date-btn" data-offset-days="7">Next Week</button>
+                                    </div>
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label small mb-1">Duration</label>
+                                    <select class="form-select schedule-duration">
+                                        <option value="60">1 hour</option>
+                                        <option value="120" selected>2 hours</option>
+                                        <option value="180">3 hours</option>
+                                        <option value="240">4 hours</option>
+                                        <option value="480">Whole day</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <p class="schedule-note">Type the time or use the small arrows. The end time fills automatically.</p>
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Resource Speaker</label>
@@ -268,41 +280,6 @@ textarea.form-control { height:120px; resize:none; }
                     <a href="events.php" class="btn btn-secondary ms-2"><i class="fas fa-arrow-left"></i> Back</a>
                 </div>
             </form>
-        </div>
-
-        <!-- Consumers Form -->
-        <div class="tab-pane fade" id="consumer" role="tabpanel">
-            <form method="POST">
-                <input type="hidden" name="form_type" value="consumer">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Title <span class="text-danger">*</span></label>
-                        <input type="text" name="c_title" class="form-control" value="<?php echo htmlspecialchars($c_title); ?>" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Start Date & Time <span class="text-danger">*</span></label>
-                        <input type="datetime-local" name="c_start_date" class="form-control" value="<?php echo htmlspecialchars($c_start_date); ?>" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">End Date & Time <span class="text-danger">*</span></label>
-                        <input type="datetime-local" name="c_end_date" class="form-control" value="<?php echo htmlspecialchars($c_end_date); ?>" required>
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label">Address / Venue</label>
-                        <input type="text" name="c_address" class="form-control" value="<?php echo htmlspecialchars($c_address); ?>">
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label">Description</label>
-                        <textarea name="c_description" class="form-control"><?php echo htmlspecialchars($c_description); ?></textarea>
-                    </div>
-                </div>
-                <div class="mt-3">
-                    <button type="submit" class="btn btn-submit"><i class="fas fa-plus"></i> Create Event</button>
-                    <a href="events.php" class="btn btn-secondary ms-2"><i class="fas fa-arrow-left"></i> Back</a>
-                </div>
-            </form>
-        </div>
-    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -320,6 +297,157 @@ function toggleGoogleMeetLink() {
 
 modeOfDelivery.addEventListener('change', toggleGoogleMeetLink);
 toggleGoogleMeetLink();
+
+function padDatePart(value) {
+    return String(value).padStart(2, '0');
+}
+
+function toDatetimeLocalValue(date) {
+    return [
+        date.getFullYear(),
+        padDatePart(date.getMonth() + 1),
+        padDatePart(date.getDate())
+    ].join('-') + 'T' + [
+        padDatePart(date.getHours()),
+        padDatePart(date.getMinutes())
+    ].join(':');
+}
+
+function roundToNextHour(date) {
+    const rounded = new Date(date);
+    rounded.setMinutes(0, 0, 0);
+    if (rounded <= date) {
+        rounded.setHours(rounded.getHours() + 1);
+    }
+    return rounded;
+}
+
+function addMinutes(date, minutes) {
+    return new Date(date.getTime() + minutes * 60000);
+}
+
+const datetimeBuilders = new Map();
+
+function clampNumber(value, min, max) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return min;
+    return Math.min(max, Math.max(min, number));
+}
+
+function dateFromLocalValue(value) {
+    if (!value) return null;
+    const [datePart, timePart] = value.split('T');
+    if (!datePart || !timePart) return null;
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hour, minute] = timePart.split(':').map(Number);
+    return new Date(year, month - 1, day, hour, minute);
+}
+
+function updateBuilderFromHidden(targetId) {
+    const builder = datetimeBuilders.get(targetId);
+    const hiddenInput = document.getElementById(targetId);
+    if (!builder || !hiddenInput || !hiddenInput.value) return;
+
+    const date = dateFromLocalValue(hiddenInput.value);
+    if (!date || Number.isNaN(date.getTime())) return;
+
+    let hour = date.getHours();
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12 || 12;
+
+    builder.date.value = hiddenInput.value.slice(0, 10);
+    builder.hour.value = hour;
+    builder.minute.value = padDatePart(date.getMinutes());
+    builder.ampm.value = ampm;
+}
+
+function updateHiddenFromBuilder(targetId) {
+    const builder = datetimeBuilders.get(targetId);
+    const hiddenInput = document.getElementById(targetId);
+    if (!builder || !hiddenInput) return;
+
+    const date = builder.date.value;
+    const hour12 = clampNumber(builder.hour.value, 1, 12);
+    const minute = clampNumber(builder.minute.value, 0, 59);
+    let hour24 = hour12 % 12;
+
+    if (builder.ampm.value === 'PM') {
+        hour24 += 12;
+    }
+
+    builder.hour.value = hour12;
+    builder.minute.value = padDatePart(minute);
+    hiddenInput.value = date ? `${date}T${padDatePart(hour24)}:${padDatePart(minute)}` : '';
+    hiddenInput.dispatchEvent(new Event('change'));
+}
+
+function setupDatetimeBuilder(builderElement) {
+    const targetId = builderElement.dataset.target;
+    const controls = {
+        date: builderElement.querySelector('.date-part'),
+        hour: builderElement.querySelector('.hour-part'),
+        minute: builderElement.querySelector('.minute-part'),
+        ampm: builderElement.querySelector('.ampm-part')
+    };
+
+    if (!targetId || Object.values(controls).some(control => !control)) return;
+
+    datetimeBuilders.set(targetId, controls);
+    Object.values(controls).forEach(control => {
+        control.addEventListener('change', () => updateHiddenFromBuilder(targetId));
+        control.addEventListener('input', () => updateHiddenFromBuilder(targetId));
+    });
+    updateBuilderFromHidden(targetId);
+}
+
+function setupScheduleHelper(helper) {
+    const startInput = document.getElementById(helper.dataset.start);
+    const endInput = document.getElementById(helper.dataset.end);
+    const durationInput = helper.querySelector('.schedule-duration');
+    const quickButtons = helper.querySelectorAll('.quick-date-btn');
+
+    if (!startInput || !endInput || !durationInput) return;
+
+    const now = new Date();
+    const minValue = toDatetimeLocalValue(now);
+    startInput.min = minValue;
+    endInput.min = minValue;
+
+    function syncEndTime(force = false) {
+        if (!startInput.value) return;
+        const start = new Date(startInput.value);
+        const currentEnd = endInput.value ? new Date(endInput.value) : null;
+        const duration = Number(durationInput.value || 120);
+
+        if (force || !currentEnd || currentEnd <= start) {
+            endInput.value = toDatetimeLocalValue(addMinutes(start, duration));
+            updateBuilderFromHidden(endInput.id);
+        }
+
+        endInput.min = startInput.value;
+    }
+
+    startInput.addEventListener('change', () => syncEndTime(false));
+    durationInput.addEventListener('change', () => syncEndTime(true));
+
+    quickButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const offsetDays = Number(button.dataset.offsetDays || 0);
+            const start = roundToNextHour(new Date());
+            start.setDate(start.getDate() + offsetDays);
+            startInput.value = toDatetimeLocalValue(start);
+            updateBuilderFromHidden(startInput.id);
+            syncEndTime(true);
+            const builder = datetimeBuilders.get(startInput.id);
+            if (builder) builder.hour.focus();
+        });
+    });
+
+    syncEndTime(false);
+}
+
+document.querySelectorAll('.datetime-builder').forEach(setupDatetimeBuilder);
+document.querySelectorAll('.schedule-helper').forEach(setupScheduleHelper);
 </script>
 </body>
 </html>

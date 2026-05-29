@@ -4,6 +4,12 @@ header('Content-Type: application/json');
 
 require_once __DIR__ . "/db.php";
 
+if (!isset($_SESSION['user_id'])) {
+    echo json_encode(["success"=>false,"error"=>"Please log in first."]);
+    exit;
+}
+
+$user_id = (int) $_SESSION['user_id'];
 $data = json_decode(file_get_contents("php://input"), true);
 $id = intval($data['id'] ?? 0);
 
@@ -24,10 +30,10 @@ $check = $conn->prepare("
             ELSE status
         END AS calculated_status
     FROM events
-    WHERE id=?
+    WHERE id=? AND created_by_user_id=?
     LIMIT 1
 ");
-$check->bind_param("i", $id);
+$check->bind_param("ii", $id, $user_id);
 $check->execute();
 $event = $check->get_result()->fetch_assoc();
 
@@ -45,8 +51,8 @@ if (
     exit;
 }
 
-$stmt = $conn->prepare("UPDATE events SET status='Canceled', remarks='Canceled' WHERE id=?");
-$stmt->bind_param("i",$id);
+$stmt = $conn->prepare("UPDATE events SET status='Canceled', remarks='Canceled' WHERE id=? AND created_by_user_id=?");
+$stmt->bind_param("ii",$id,$user_id);
 
 if($stmt->execute()){
     echo json_encode(["success"=>true]);

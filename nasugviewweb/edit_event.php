@@ -3,6 +3,13 @@ session_start();
 
 require_once __DIR__ . "/db.php";
 
+if (!isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit();
+}
+
+$user_id = (int) $_SESSION['user_id'];
+
 // Get event ID safely
 $id = intval($_GET['id']);
 
@@ -33,23 +40,29 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
         title=?, start_date_and_time=?, end_date_and_time=?, address=?, 
         mode_of_delivery=?, google_meet_link=?, speaker=?, audience=?, 
         budget=?, funding_source=?, description=?
-        WHERE id=?
+        WHERE id=? AND created_by_user_id=?
     ");
 
-    // Bind params correctly (11 strings + 1 int)
+    // Bind params correctly (11 strings + 2 ints)
     $stmt->bind_param(
-        "sssssssssssi",
+        "sssssssssssii",
         $title, $start, $end, $address, $mode, $google_meet_link, $speaker,
-        $audience, $budget, $funding, $description, $id
+        $audience, $budget, $funding, $description, $id, $user_id
     );
 
     $stmt->execute();
 
-    $updated = true; // mark successful update
+    $updated = $stmt->affected_rows >= 0; // mark successful update
 }
 
 // Fetch event safely
-$event = $conn->query("SELECT * FROM events WHERE id=$id")->fetch_assoc() ?? [];
+$eventStmt = $conn->prepare("SELECT * FROM events WHERE id=? AND created_by_user_id=? LIMIT 1");
+$eventStmt->bind_param("ii", $id, $user_id);
+$eventStmt->execute();
+$event = $eventStmt->get_result()->fetch_assoc() ?? [];
+if (!$event) {
+    die("Event not found or not allowed.");
+}
 ?>
 
 <!DOCTYPE html>
@@ -105,6 +118,7 @@ form {
         <option value="">Select Mode</option>
         <option value="Seminar" <?= (($event['mode_of_delivery'] ?? '') === 'Seminar') ? 'selected' : '' ?>>Seminar</option>
         <option value="Webinar" <?= (($event['mode_of_delivery'] ?? '') === 'Webinar') ? 'selected' : '' ?>>Webinar</option>
+        <option value="Public Event" <?= (($event['mode_of_delivery'] ?? '') === 'Public Event') ? 'selected' : '' ?>>Public Event</option>
     </select>
     <input type="url" class="form-control mb-2" name="google_meet_link" id="googleMeetLink" value="<?= htmlspecialchars($event['google_meet_link'] ?? '') ?>" placeholder="Google Meet Link">
     <input class="form-control mb-2" name="speaker" value="<?= htmlspecialchars($event['speaker'] ?? '') ?>" placeholder="Resource Speaker">

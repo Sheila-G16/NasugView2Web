@@ -3,12 +3,71 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($admin_fullname, $designation) && isset($_SESSION['user_id'])) {
-    if (!isset($conn) || !($conn instanceof mysqli)) {
-        require_once 'db.php';
+if (!function_exists('nasugviewdti_sidebar_initials')) {
+    function nasugviewdti_sidebar_initials(string $name): string
+    {
+        $parts = preg_split('/\s+/', trim($name));
+        $initials = '';
+
+        foreach ($parts as $part) {
+            if ($part !== '') {
+                $initials .= strtoupper(substr($part, 0, 1));
+            }
+
+            if (strlen($initials) >= 2) {
+                break;
+            }
+        }
+
+        return $initials !== '' ? $initials : 'U';
+    }
+}
+
+if (!function_exists('nasugviewdti_sidebar_profile_src')) {
+    function nasugviewdti_sidebar_profile_src(string $image, string $baseDir): string
+    {
+        $image = trim($image);
+
+        if ($image === '') {
+            return '';
+        }
+
+        $cleanImage = ltrim(str_replace('\\', '/', $image), '/');
+        $candidates = [
+            $cleanImage,
+            'uploads/' . basename($cleanImage)
+        ];
+
+        foreach (array_unique($candidates) as $candidate) {
+            if (is_file($baseDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $candidate))) {
+                return $candidate;
+            }
+        }
+
+        return '';
+    }
+}
+
+$sidebar_profile_image = $sidebar_profile_image ?? ($admin['profile_picture'] ?? '');
+
+if (isset($_SESSION['user_id']) && (!isset($admin_fullname, $designation) || $sidebar_profile_image === '')) {
+    $sidebar_conn = null;
+
+    if (isset($conn) && $conn instanceof mysqli) {
+        try {
+            $conn->query("DO 1");
+            $sidebar_conn = $conn;
+        } catch (Throwable $e) {
+            $sidebar_conn = null;
+        }
     }
 
-    $stmt = $conn->prepare("SELECT username, fname, lname, designation FROM dti_user WHERE dti_id=? LIMIT 1");
+    if (!$sidebar_conn) {
+        require __DIR__ . '/db.php';
+        $sidebar_conn = $conn;
+    }
+
+    $stmt = $sidebar_conn->prepare("SELECT username, fname, lname, designation, profile_picture FROM dti_user WHERE dti_id=? LIMIT 1");
     if ($stmt) {
         $stmt->bind_param("i", $_SESSION['user_id']);
         $stmt->execute();
@@ -23,6 +82,7 @@ if (!isset($admin_fullname, $designation) && isset($_SESSION['user_id'])) {
                 ? trim($fname . ' ' . $lname)
                 : ($username !== '' ? $username : 'User');
             $designation = trim($row['designation'] ?? '') ?: 'User';
+            $sidebar_profile_image = trim($row['profile_picture'] ?? '') ?: $sidebar_profile_image;
         }
 
         $stmt->close();
@@ -31,6 +91,8 @@ if (!isset($admin_fullname, $designation) && isset($_SESSION['user_id'])) {
 
 $admin_fullname = $admin_fullname ?? "User";
 $designation = $designation ?? "User";
+$sidebar_profile_src = nasugviewdti_sidebar_profile_src($sidebar_profile_image, __DIR__);
+$sidebar_initials = nasugviewdti_sidebar_initials($admin_fullname);
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 
@@ -49,7 +111,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <div class="sidebar-header">
 
         <div class="logo">
-            <img src="assets/nasugviewlogoblue.png" alt="NasugView Logo" class="logo-img">
+            <?php if ($sidebar_profile_src !== ''): ?>
+                <img src="<?php echo htmlspecialchars($sidebar_profile_src); ?>" alt="<?php echo htmlspecialchars($admin_fullname); ?> profile photo" class="profile-photo">
+            <?php else: ?>
+                <div class="profile-photo profile-photo-fallback" aria-label="<?php echo htmlspecialchars($admin_fullname); ?> profile photo">
+                    <?php echo htmlspecialchars($sidebar_initials); ?>
+                </div>
+            <?php endif; ?>
         </div>
 
         <div class="user-info">
@@ -124,7 +192,7 @@ body, .sidebar, .sidebar a, .user-info {
 }
 
 .sidebar-header {
-    background: linear-gradient(to bottom, #ffffff 0%, #ffffff 0%, #001a47 100%);
+    background: #002565;
     padding: 2.5rem 1.5rem 2rem;
     position: sticky;
     top: 0;
@@ -141,8 +209,25 @@ body, .sidebar, .sidebar a, .user-info {
     margin-bottom: 1rem;
 }
 
-.logo-img {
-    width: 150px;
+.profile-photo {
+    width: 104px;
+    height: 104px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 4px solid rgba(255,255,255,0.88);
+    box-shadow: 0 14px 28px rgba(0,26,71,0.28);
+    background: #fff;
+}
+
+.profile-photo-fallback {
+    background: linear-gradient(135deg,#5b8be0,#001a47);
+    color: #fff;
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: 0;
 }
 
 .user-info {
@@ -268,8 +353,9 @@ body.sidebar-open {
         padding:2rem 1rem 1.5rem;
     }
 
-    .logo-img {
-        width:130px;
+    .profile-photo {
+        width:92px;
+        height:92px;
     }
 
     .sidebar-menu ul li a {

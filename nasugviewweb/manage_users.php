@@ -2,14 +2,31 @@
 session_start();
 require_once __DIR__ . "/db.php";
 
+if (!isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit();
+}
+
+$loggedInUserId = (int) $_SESSION['user_id'];
+$centerStmt = $conn->prepare("SELECT negosyocenter FROM negosyo_center_users WHERE id=? LIMIT 1");
+$centerStmt->bind_param("i", $loggedInUserId);
+$centerStmt->execute();
+$currentCenter = trim((string) ($centerStmt->get_result()->fetch_assoc()['negosyocenter'] ?? ''));
+$centerStmt->close();
+
 if(isset($_GET['delete'])){
     $id=intval($_GET['delete']);
-    $conn->query("DELETE FROM negosyo_center_users WHERE id=$id");
+    $deleteStmt = $conn->prepare("DELETE FROM negosyo_center_users WHERE id=? AND negosyocenter=?");
+    $deleteStmt->bind_param("is", $id, $currentCenter);
+    $deleteStmt->execute();
     header("Location: manage_users.php");
     exit();
 }
 
-$users=$conn->query("SELECT * FROM negosyo_center_users ORDER BY id DESC");
+$usersStmt = $conn->prepare("SELECT * FROM negosyo_center_users WHERE negosyocenter=? ORDER BY id DESC");
+$usersStmt->bind_param("s", $currentCenter);
+$usersStmt->execute();
+$users = $usersStmt->get_result();
 ?>
 
 <!DOCTYPE html>

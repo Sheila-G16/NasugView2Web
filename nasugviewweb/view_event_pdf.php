@@ -3,6 +3,12 @@ session_start();
 
 require_once __DIR__ . "/db.php";
 
+if (!isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit();
+}
+
+$user_id = (int) $_SESSION['user_id'];
 $id = intval($_GET['id'] ?? 0);
 if (!$id) die("Invalid event.");
 
@@ -16,10 +22,10 @@ $stmt = $conn->prepare("
             ELSE status
         END AS calculated_status
     FROM events
-    WHERE id=?
+    WHERE id=? AND created_by_user_id=?
     LIMIT 1
 ");
-$stmt->bind_param("i", $id);
+$stmt->bind_param("ii", $id, $user_id);
 $stmt->execute();
 $event = $stmt->get_result()->fetch_assoc();
 if (!$event) die("Event not found.");

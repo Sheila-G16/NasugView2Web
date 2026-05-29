@@ -9,17 +9,20 @@ $smtpConfig = is_file($smtpConfigFile) ? require $smtpConfigFile : [];
 $admin_fullname = "User";
 $designation = "Admin";
 
-if (isset($_SESSION['user_id'])) {
-    $id = (int) $_SESSION['user_id'];
-    $stmt = $conn->prepare("SELECT fname, lname, designation FROM negosyo_center_users WHERE id = ?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $result = $stmt->get_result();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit();
+}
 
-    if ($row = $result->fetch_assoc()) {
-        $admin_fullname = trim($row['fname'] . " " . $row['lname']);
-        $designation = $row['designation'];
-    }
+$id = (int) $_SESSION['user_id'];
+$stmt = $conn->prepare("SELECT fname, lname, designation FROM negosyo_center_users WHERE id = ?");
+$stmt->bind_param("i", $id);
+$stmt->execute();
+$result = $stmt->get_result();
+
+if ($row = $result->fetch_assoc()) {
+    $admin_fullname = trim($row['fname'] . " " . $row['lname']);
+    $designation = $row['designation'];
 }
 
 function formatCertificateEventDate($start, $end) {
@@ -214,7 +217,7 @@ $certificateTemplateName = 'certificate-design';
 $selectedEvaluationId = isset($_GET['evaluation_id']) ? (int) $_GET['evaluation_id'] : 0;
 $selectedCertificateEventCode = isset($_GET['event_code']) ? trim((string) $_GET['event_code']) : '';
 $certificateEventOptions = [];
-$certificateEventResult = $conn->query("
+$certificateEventStmt = $conn->prepare("
     SELECT
         ee.event_code,
         COUNT(*) AS total_participants,
@@ -224,10 +227,11 @@ $certificateEventResult = $conn->query("
         e.end_date_and_time,
         e.address
     FROM event_evaluations ee
-    LEFT JOIN events e
+    INNER JOIN events e
         ON e.id = ee.event_id
     WHERE ee.event_code IS NOT NULL
         AND TRIM(ee.event_code) <> ''
+        AND e.created_by_user_id = ?
     GROUP BY
         ee.event_code,
         e.title,
@@ -237,10 +241,21 @@ $certificateEventResult = $conn->query("
     ORDER BY last_evaluated_at DESC, ee.event_code ASC
 ");
 
+$certificateEventResult = null;
+if ($certificateEventStmt) {
+    $certificateEventStmt->bind_param("i", $id);
+    $certificateEventStmt->execute();
+    $certificateEventResult = $certificateEventStmt->get_result();
+}
+
 if ($certificateEventResult) {
     while ($eventRow = $certificateEventResult->fetch_assoc()) {
         $certificateEventOptions[] = $eventRow;
     }
+}
+
+if ($certificateEventStmt) {
+    $certificateEventStmt->close();
 }
 
 $validCertificateEventCodes = array_map(function ($eventRow) {
@@ -266,12 +281,12 @@ $certificateQuery = "
         e.end_date_and_time,
         e.address
     FROM event_evaluations ee
-    LEFT JOIN events e
+    INNER JOIN events e
         ON e.id = ee.event_id
-    WHERE 1 = 1
+    WHERE e.created_by_user_id = ?
 ";
-$certificateParams = [];
-$certificateTypes = '';
+$certificateParams = [$id];
+$certificateTypes = 'i';
 $hasCertificateCriteria = false;
 
 if ($selectedEvaluationId > 0) {
@@ -285,9 +300,6 @@ if ($selectedEvaluationId > 0) {
     $certificateTypes .= 's';
     $hasCertificateCriteria = true;
 } elseif (isset($_SESSION['user_id'])) {
-    $certificateQuery .= " AND ee.user_id = ?";
-    $certificateParams[] = (int) $_SESSION['user_id'];
-    $certificateTypes .= 'i';
     $hasCertificateCriteria = true;
 }
 
@@ -320,17 +332,20 @@ $certificateParticipants = [];
 if ($selectedCertificateEventCode !== '') {
     $participantStmt = $conn->prepare("
         SELECT
-            id,
-            full_name,
-            email,
-            event_code
-        FROM event_evaluations
-        WHERE event_code = ?
-        ORDER BY full_name ASC, created_at DESC, id DESC
+            ee.id,
+            ee.full_name,
+            ee.email,
+            ee.event_code
+        FROM event_evaluations ee
+        INNER JOIN events e
+            ON e.id = ee.event_id
+        WHERE ee.event_code = ?
+            AND e.created_by_user_id = ?
+        ORDER BY ee.full_name ASC, ee.created_at DESC, ee.id DESC
     ");
 
     if ($participantStmt) {
-        $participantStmt->bind_param("s", $selectedCertificateEventCode);
+        $participantStmt->bind_param("si", $selectedCertificateEventCode, $id);
         $participantStmt->execute();
         $participantResult = $participantStmt->get_result();
         while ($participantRow = $participantResult->fetch_assoc()) {

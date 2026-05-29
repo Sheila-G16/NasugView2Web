@@ -313,6 +313,244 @@ a {
     font-weight:600;
 }
 
+.online-hero-art {
+    position:relative;
+    min-height:342px;
+    overflow:visible;
+    border-radius:8px;
+    background:transparent;
+}
+
+.online-hero-art::before {
+    content:"";
+    position:absolute;
+    right:18px;
+    top:-2px;
+    width:330px;
+    height:330px;
+    border-radius:50%;
+    border:1px solid rgba(255,255,255,.38);
+    box-shadow:
+        0 0 0 34px rgba(255,255,255,.05),
+        0 0 0 66px rgba(255,255,255,.032),
+        inset 0 0 34px rgba(255,255,255,.08);
+    animation:networkGlow 4.8s ease-in-out infinite alternate;
+}
+
+.digital-orbit {
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+}
+
+.digital-line {
+    position:absolute;
+    left:18%;
+    right:7%;
+    height:2px;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,.8), rgba(117,221,245,.9), transparent);
+    transform-origin:center;
+    opacity:.9;
+}
+
+.digital-line.line-one { top:24%; transform:rotate(-18deg); }
+.digital-line.line-two { top:42%; transform:rotate(6deg); }
+.digital-line.line-three { top:55%; transform:rotate(-7deg); }
+
+.digital-node {
+    position:absolute;
+    width:13px;
+    height:13px;
+    border-radius:50%;
+    background:#ffd45a;
+    box-shadow:0 0 0 8px rgba(255,212,90,.16), 0 0 24px rgba(255,212,90,.7);
+    animation:nodePulse 2.5s ease-in-out infinite;
+}
+
+.node-a { left:28%; top:22%; }
+.node-b { right:30%; top:15%; animation-delay:.45s; }
+.node-c { right:14%; bottom:39%; animation-delay:.9s; }
+
+.floating-ui {
+    position:absolute;
+    display:flex;
+    align-items:center;
+    gap:.55rem;
+    padding:.62rem .76rem;
+    border-radius:8px;
+    color:var(--primary-color);
+    background:rgba(255,255,255,.94);
+    box-shadow:0 16px 34px rgba(0,16,48,.2);
+    font-size:.7rem;
+    font-weight:800;
+    animation:cardFloat 4.2s ease-in-out infinite;
+}
+
+.floating-ui i {
+    color:var(--accent-color);
+}
+
+.ui-store { top:20%; left:7%; }
+.ui-review { top:8%; right:9%; animation-delay:.6s; }
+.ui-chat { left:25%; bottom:24%; animation-delay:1.1s; }
+
+.hero-laptop {
+    position:absolute;
+    right:23%;
+    bottom:0;
+    width:258px;
+    height:74px;
+    border-radius:10px 10px 24px 24px;
+    background:linear-gradient(180deg, #f3fbff, #9fcfe0);
+    box-shadow:0 20px 36px rgba(0,10,34,.24);
+}
+
+.hero-laptop::before {
+    content:"";
+    position:absolute;
+    left:30px;
+    right:30px;
+    top:-108px;
+    height:120px;
+    border:5px solid rgba(255,255,255,.8);
+    border-radius:8px;
+    background:
+        linear-gradient(90deg, rgba(0,26,71,.08) 1px, transparent 1px),
+        linear-gradient(rgba(0,26,71,.08) 1px, transparent 1px),
+        radial-gradient(circle at 60% 40%, rgba(255,255,255,.64), transparent 18%),
+        linear-gradient(135deg, #e8f8ff, #68b8d5);
+    background-size:26px 26px, 26px 26px, 100% 100%;
+}
+
+.screen-card {
+    position:absolute;
+    left:27%;
+    right:42%;
+    bottom:106px;
+    height:62px;
+    border-radius:8px;
+    background:#fff;
+    box-shadow:0 12px 26px rgba(0,26,71,.16);
+    animation:cardFloat 3.6s ease-in-out infinite;
+}
+
+.screen-card::before,
+.screen-card::after {
+    content:"";
+    position:absolute;
+    left:12px;
+    right:12px;
+    height:8px;
+    border-radius:999px;
+    background:#b7dff0;
+}
+
+.screen-card::before { top:14px; }
+.screen-card::after {
+    top:32px;
+    right:38px;
+    background:#ffd45a;
+}
+
+.online-person {
+    position:absolute;
+    bottom:0;
+    width:132px;
+    height:234px;
+    animation:personFloat 4.6s ease-in-out infinite;
+}
+
+.person-business {
+    right:28%;
+}
+
+.person-consumer {
+    right:4%;
+    animation-delay:.55s;
+}
+
+.online-person::before {
+    content:"";
+    position:absolute;
+    left:34px;
+    top:0;
+    width:58px;
+    height:58px;
+    border-radius:50%;
+    background:#f1b087;
+    box-shadow:
+        0 -15px 0 -6px #17334c,
+        -20px 34px 0 -18px rgba(255,255,255,.86),
+        20px 34px 0 -18px rgba(255,255,255,.86);
+}
+
+.online-person::after {
+    content:"";
+    position:absolute;
+    left:18px;
+    right:18px;
+    top:64px;
+    bottom:0;
+    border-radius:48px 48px 12px 12px;
+    background:
+        linear-gradient(90deg, transparent 0 16%, #dcecf5 17% 32%, transparent 33% 67%, #dcecf5 68% 83%, transparent 84%),
+        linear-gradient(180deg, #e8f4fb 0 42%, #20659a 43% 100%);
+}
+
+.person-consumer::before {
+    background:#e6a27a;
+    box-shadow:
+        0 -18px 0 -5px #101a28,
+        -20px 34px 0 -18px #101a28,
+        20px 34px 0 -18px #101a28;
+}
+
+.person-consumer::after {
+    background:
+        linear-gradient(90deg, transparent 0 18%, #101a28 19% 31%, transparent 32% 68%, #101a28 69% 81%, transparent 82%),
+        linear-gradient(180deg, #182436 0 100%);
+}
+
+@keyframes networkGlow {
+    from {
+        transform:scale(.98);
+        opacity:.72;
+    }
+    to {
+        transform:scale(1.02);
+        opacity:1;
+    }
+}
+
+@keyframes nodePulse {
+    0%, 100% {
+        transform:scale(1);
+        opacity:.78;
+    }
+    50% {
+        transform:scale(1.35);
+        opacity:1;
+    }
+}
+
+@keyframes cardFloat {
+    0%, 100% {
+        transform:translateY(0);
+    }
+    50% {
+        transform:translateY(-10px);
+    }
+}
+
+@keyframes personFloat {
+    0%, 100% {
+        transform:translateY(0);
+    }
+    50% {
+        transform:translateY(-7px);
+    }
+}
+
 .hero-panel {
     background:rgba(255,255,255,.96);
     color:var(--ink-color);
@@ -865,6 +1103,10 @@ section {
         margin-top:2rem;
     }
 
+    .online-hero-art {
+        margin-top:2rem;
+    }
+
 }
 
 @media (max-width:767px) {
@@ -884,6 +1126,30 @@ section {
 
     .brand-lockup img {
         width:118px;
+    }
+
+    .online-hero-art {
+        min-height:360px;
+    }
+
+    .floating-ui {
+        font-size:.66rem;
+        padding:.55rem .62rem;
+    }
+
+    .hero-laptop {
+        left:7%;
+        right:7%;
+        width:auto;
+    }
+
+    .online-person {
+        width:98px;
+        height:166px;
+    }
+
+    .person-business {
+        right:31%;
     }
 
     .step-card {
@@ -937,7 +1203,7 @@ section {
         <div class="water-wave wave-c" aria-hidden="true"></div>
         <div class="container hero-content">
             <div class="row align-items-center g-5">
-                <div class="col-lg-9 reveal">
+                <div class="col-lg-6 reveal">
                     <span class="eyebrow"><i class="fa-solid fa-store"></i> Nasugbu business and community platform</span>
                     <h1>Discover businesses in one digital hub.</h1>
                     <p>
@@ -957,6 +1223,27 @@ section {
                     </div>
                 </div>
 
+                <div class="col-lg-6 reveal">
+                    <div class="online-hero-art" role="img" aria-label="Animated illustration of local businesses and consumers connected online">
+                        <div class="digital-orbit" aria-hidden="true">
+                            <div class="digital-line line-one"></div>
+                            <div class="digital-line line-two"></div>
+                            <div class="digital-line line-three"></div>
+                            <span class="digital-node node-a"></span>
+                            <span class="digital-node node-b"></span>
+                            <span class="digital-node node-c"></span>
+                        </div>
+
+                        <div class="floating-ui ui-store"><i class="fa-solid fa-store"></i> Business profile</div>
+                        <div class="floating-ui ui-review"><i class="fa-solid fa-star"></i> Reviews</div>
+                        <div class="floating-ui ui-chat"><i class="fa-solid fa-comments"></i> Online inquiry</div>
+
+                        <div class="hero-laptop" aria-hidden="true"></div>
+                        <div class="screen-card" aria-hidden="true"></div>
+                        <div class="online-person person-business" aria-hidden="true"></div>
+                        <div class="online-person person-consumer" aria-hidden="true"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>

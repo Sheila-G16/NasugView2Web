@@ -40,19 +40,40 @@ $columns = [
     'created_at' => 'Created At'
 ];
 
-$fieldList = implode(', ', array_keys($columns));
+$fieldList = implode(', ', array_map(function ($field) {
+    return "ee.`" . str_replace("`", "``", $field) . "`";
+}, array_keys($columns)));
 $selectedEventCode = isset($_GET['event_code']) ? trim((string) $_GET['event_code']) : '';
+$loggedInUserId = (int) $_SESSION['user_id'];
 $result = null;
 
 if ($selectedEventCode !== '') {
-    $stmt = $conn->prepare("SELECT {$fieldList} FROM event_evaluations WHERE event_code = ? ORDER BY created_at DESC, id DESC");
+    $stmt = $conn->prepare("
+        SELECT {$fieldList}
+        FROM event_evaluations ee
+        INNER JOIN events e ON e.id = ee.event_id
+        WHERE ee.event_code = ?
+            AND e.created_by_user_id = ?
+        ORDER BY ee.created_at DESC, ee.id DESC
+    ");
     if ($stmt) {
-        $stmt->bind_param("s", $selectedEventCode);
+        $stmt->bind_param("si", $selectedEventCode, $loggedInUserId);
         $stmt->execute();
         $result = $stmt->get_result();
     }
 } else {
-    $result = $conn->query("SELECT {$fieldList} FROM event_evaluations ORDER BY created_at DESC, id DESC");
+    $stmt = $conn->prepare("
+        SELECT {$fieldList}
+        FROM event_evaluations ee
+        INNER JOIN events e ON e.id = ee.event_id
+        WHERE e.created_by_user_id = ?
+        ORDER BY ee.created_at DESC, ee.id DESC
+    ");
+    if ($stmt) {
+        $stmt->bind_param("i", $loggedInUserId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+    }
 }
 
 $evaluationRows = [];
@@ -199,9 +220,9 @@ function formatExportEventSchedule($event) {
 
 $selectedEvent = null;
 if ($selectedEventCode !== '') {
-    $eventStmt = $conn->prepare("SELECT event_code, title, start_date_and_time, end_date_and_time FROM events WHERE event_code = ? LIMIT 1");
+    $eventStmt = $conn->prepare("SELECT event_code, title, start_date_and_time, end_date_and_time FROM events WHERE event_code = ? AND created_by_user_id = ? LIMIT 1");
     if ($eventStmt) {
-        $eventStmt->bind_param("s", $selectedEventCode);
+        $eventStmt->bind_param("si", $selectedEventCode, $loggedInUserId);
         $eventStmt->execute();
         $selectedEvent = $eventStmt->get_result()->fetch_assoc();
         $eventStmt->close();

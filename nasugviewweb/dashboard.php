@@ -2,29 +2,71 @@
 session_start();
 
 require_once __DIR__ . "/db.php";
+require_once __DIR__ . "/account_security.php";
+
+nasugviewweb_ensure_password_security_columns($conn);
+
+if (!isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit();
+}
+
+$id = (int) $_SESSION['user_id'];
+$fname = $lname = $username = $admin_fullname = '';
+$negosyoCenter = '';
+$mustChangePassword = (int) ($_SESSION['must_change_password'] ?? 0);
 
 /* GET LOGGED IN ADMIN INFO */
-if (isset($_SESSION['user_id'])) {
-    $id = $_SESSION['user_id'];
-    $stmt = $conn->prepare("SELECT username, fname, lname FROM negosyo_center_users WHERE id=?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $result = $stmt->get_result();
+$stmt = $conn->prepare("SELECT username, fname, lname, negosyocenter, must_change_password FROM negosyo_center_users WHERE id=?");
+$stmt->bind_param("i", $id);
+$stmt->execute();
+$result = $stmt->get_result();
 
-    if ($row = $result->fetch_assoc()) {
-        $fname = trim($row['fname']);
-        $lname = trim($row['lname']);
-        $username = trim($row['username']);
-        $admin_fullname = ($fname || $lname) ? trim($fname.' '.$lname) : $username;
-    }
+if ($row = $result->fetch_assoc()) {
+    $fname = trim($row['fname']);
+    $lname = trim($row['lname']);
+    $username = trim($row['username']);
+    $negosyoCenter = trim($row['negosyocenter'] ?? '');
+    $admin_fullname = ($fname || $lname) ? trim($fname.' '.$lname) : $username;
+    $mustChangePassword = (int) ($row['must_change_password'] ?? 0);
+    $_SESSION['must_change_password'] = $mustChangePassword;
 }
 
 /* DASHBOARD COUNTS */
-$totalUsers = $conn->query("SELECT COUNT(*) as total FROM negosyo_center_users")->fetch_assoc()['total'] ?? 0;
-$totalAdmins = $conn->query("SELECT COUNT(*) as total FROM negosyo_center_users WHERE designation='Admin'")->fetch_assoc()['total'] ?? 0;
-$totalStaff = $conn->query("SELECT COUNT(*) as total FROM negosyo_center_users WHERE designation='Staff'")->fetch_assoc()['total'] ?? 0;
-$totalAttendees = $conn->query("SELECT COUNT(*) as total FROM event_registrations")
-                       ->fetch_assoc()['total'] ?? 0; 
+$centerUserStmt = $conn->prepare("SELECT COUNT(*) as total FROM negosyo_center_users WHERE negosyocenter = ?");
+$centerUserStmt->bind_param("s", $negosyoCenter);
+$centerUserStmt->execute();
+$totalUsers = $centerUserStmt->get_result()->fetch_assoc()['total'] ?? 0;
+$centerUserStmt->close();
+
+$centerUserStmt = $conn->prepare("SELECT COUNT(*) as total FROM negosyo_center_users WHERE negosyocenter = ? AND designation='Admin'");
+$centerUserStmt->bind_param("s", $negosyoCenter);
+$centerUserStmt->execute();
+$totalAdmins = $centerUserStmt->get_result()->fetch_assoc()['total'] ?? 0;
+$centerUserStmt->close();
+
+$centerUserStmt = $conn->prepare("SELECT COUNT(*) as total FROM negosyo_center_users WHERE negosyocenter = ? AND designation='Staff'");
+$centerUserStmt->bind_param("s", $negosyoCenter);
+$centerUserStmt->execute();
+$totalStaff = $centerUserStmt->get_result()->fetch_assoc()['total'] ?? 0;
+$centerUserStmt->close();
+
+$totalEventStmt = $conn->prepare("SELECT COUNT(*) as total FROM events WHERE created_by_user_id = ?");
+$totalEventStmt->bind_param("i", $id);
+$totalEventStmt->execute();
+$totalEvents = $totalEventStmt->get_result()->fetch_assoc()['total'] ?? 0;
+$totalEventStmt->close();
+
+$attendeeStmt = $conn->prepare("
+    SELECT COUNT(*) as total
+    FROM event_registrations er
+    INNER JOIN events e ON e.event_code = er.event_code
+    WHERE e.created_by_user_id = ?
+");
+$attendeeStmt->bind_param("i", $id);
+$attendeeStmt->execute();
+$totalAttendees = $attendeeStmt->get_result()->fetch_assoc()['total'] ?? 0;
+$attendeeStmt->close();
 /* ===== ATTENDEES BY CITY DATA ===== */
 $municipalityYear = isset($_GET['municipality_year']) ? trim((string) $_GET['municipality_year']) : '';
 $municipalityMonth = isset($_GET['municipality_month']) ? trim((string) $_GET['municipality_month']) : '';
@@ -36,27 +78,27 @@ $municipalityDay = preg_match('/^\d{4}-\d{2}-\d{2}$/', $municipalityDay) ? $muni
 
 $municipalityFilterType = 'year';
 $municipalityFilterValue = $municipalityYear !== '' ? $municipalityYear : date('Y');
-$municipalityLabelExpression = "DATE_FORMAT(created_at, '%Y-%m')";
-$municipalityWhereClause = 'YEAR(created_at) = ?';
-$municipalityParams = [$municipalityFilterValue];
-$municipalityParamTypes = 'i';
+$municipalityLabelExpression = "DATE_FORMAT(er.created_at, '%Y-%m')";
+$municipalityWhereClause = 'YEAR(er.created_at) = ?';
+$municipalityParams = [$id, $municipalityFilterValue];
+$municipalityParamTypes = 'ii';
 $municipalityXAxisTitle = 'Month';
 
 if ($municipalityDay !== '') {
     $municipalityFilterType = 'day';
     $municipalityFilterValue = $municipalityDay;
-    $municipalityLabelExpression = 'DATE(created_at)';
-    $municipalityWhereClause = 'DATE(created_at) = ?';
-    $municipalityParams = [$municipalityDay];
-    $municipalityParamTypes = 's';
+    $municipalityLabelExpression = 'DATE(er.created_at)';
+    $municipalityWhereClause = 'DATE(er.created_at) = ?';
+    $municipalityParams = [$id, $municipalityDay];
+    $municipalityParamTypes = 'is';
     $municipalityXAxisTitle = 'Date';
 } elseif ($municipalityMonth !== '') {
     $municipalityFilterType = 'month';
     $municipalityFilterValue = $municipalityMonth;
-    $municipalityLabelExpression = 'DATE(created_at)';
-    $municipalityWhereClause = "DATE_FORMAT(created_at, '%Y-%m') = ?";
-    $municipalityParams = [$municipalityMonth];
-    $municipalityParamTypes = 's';
+    $municipalityLabelExpression = 'DATE(er.created_at)';
+    $municipalityWhereClause = "DATE_FORMAT(er.created_at, '%Y-%m') = ?";
+    $municipalityParams = [$id, $municipalityMonth];
+    $municipalityParamTypes = 'is';
     $municipalityXAxisTitle = 'Day';
 }
 
@@ -69,16 +111,18 @@ $municipalityTotals = [];
 
 $municipalityQuery = "
     SELECT
-        city,
+        er.city,
         {$municipalityLabelExpression} AS date_key,
         COUNT(*) AS total
-    FROM event_registrations
-    WHERE city IS NOT NULL
-        AND TRIM(city) <> ''
-        AND created_at IS NOT NULL
+    FROM event_registrations er
+    INNER JOIN events e ON e.event_code = er.event_code
+    WHERE e.created_by_user_id = ?
+        AND er.city IS NOT NULL
+        AND TRIM(er.city) <> ''
+        AND er.created_at IS NOT NULL
         AND {$municipalityWhereClause}
-    GROUP BY city, {$municipalityLabelExpression}
-    ORDER BY date_key ASC, city ASC
+    GROUP BY er.city, {$municipalityLabelExpression}
+    ORDER BY date_key ASC, er.city ASC
 ";
 
 $municipalityStmt = $conn->prepare($municipalityQuery);
@@ -104,6 +148,80 @@ if ($municipalityResult) {
 
 if ($municipalityStmt) {
     $municipalityStmt->close();
+}
+
+$registrationRows = [];
+$registrationStmt = $conn->prepare("
+    SELECT
+        er.id,
+        er.email,
+        er.first_name,
+        er.last_name,
+        er.contact_number,
+        er.negosyo_center,
+        er.age,
+        er.sex,
+        er.social_classification,
+        er.ofw,
+        er.province,
+        er.city,
+        er.barangay,
+        er.business_name,
+        er.business_address,
+        er.position,
+        er.question,
+        er.created_at,
+        er.event_code,
+        e.title AS event_title,
+        e.start_date_and_time,
+        e.end_date_and_time,
+        ee.id AS evaluation_id,
+        ee.created_at AS evaluated_at
+    FROM event_registrations er
+    INNER JOIN events e
+        ON e.event_code = er.event_code
+    LEFT JOIN event_evaluations ee
+        ON ee.event_id = e.id
+        AND (
+            LOWER(TRIM(ee.email)) = LOWER(TRIM(er.email))
+            OR (
+                LOWER(TRIM(ee.full_name)) = LOWER(TRIM(CONCAT(er.first_name, ' ', er.last_name)))
+                AND (ee.contact_number IS NULL OR ee.contact_number = '' OR ee.contact_number = er.contact_number)
+            )
+        )
+    WHERE e.created_by_user_id = ?
+    ORDER BY er.created_at DESC, er.id DESC
+    LIMIT 100
+");
+
+if ($registrationStmt) {
+    $registrationStmt->bind_param("i", $id);
+    $registrationStmt->execute();
+    $registrationResult = $registrationStmt->get_result();
+    while ($row = $registrationResult->fetch_assoc()) {
+        $registrationRows[] = $row;
+    }
+    $registrationStmt->close();
+}
+
+$evaluatedRegistrationCount = 0;
+$notYetEvaluatedRegistrationCount = 0;
+$notEvaluatedRegistrationCount = 0;
+$nowTs = time();
+foreach ($registrationRows as $registrationRow) {
+    if (!empty($registrationRow['evaluation_id'])) {
+        $evaluatedRegistrationCount++;
+        continue;
+    }
+
+    $eventEndTs = !empty($registrationRow['end_date_and_time']) ? strtotime($registrationRow['end_date_and_time']) : false;
+    $evaluationDeadlineTs = $eventEndTs ? $eventEndTs + (24 * 60 * 60) : false;
+
+    if ($evaluationDeadlineTs && $nowTs <= $evaluationDeadlineTs) {
+        $notYetEvaluatedRegistrationCount++;
+    } else {
+        $notEvaluatedRegistrationCount++;
+    }
 }
 
 if ($municipalityFilterType === 'year') {
@@ -176,10 +294,11 @@ if ($day !== '') {
     $chartTitle = 'Events Created on ' . date('F j, Y', strtotime($day));
     $query = "SELECT DATE(created_at) AS label, COUNT(*) AS total
               FROM events
-              WHERE DATE(created_at) = ?
+              WHERE created_by_user_id = ?
+                AND DATE(created_at) = ?
               GROUP BY DATE(created_at)";
-    $params[] = $day;
-    $paramTypes = 's';
+    $params = [$id, $day];
+    $paramTypes = 'is';
     $monthLabels = [date('M j, Y', strtotime($day))];
     $counts = [0];
 } elseif ($month !== '') {
@@ -192,11 +311,12 @@ if ($day !== '') {
 
     $query = "SELECT DAY(created_at) AS label, COUNT(*) AS total
               FROM events
-              WHERE DATE_FORMAT(created_at, '%Y-%m') = ?
+              WHERE created_by_user_id = ?
+                AND DATE_FORMAT(created_at, '%Y-%m') = ?
               GROUP BY DAY(created_at)
               ORDER BY DAY(created_at) ASC";
-    $params[] = $month;
-    $paramTypes = 's';
+    $params = [$id, $month];
+    $paramTypes = 'is';
 } else {
     $selectedYear = $year !== '' ? $year : date('Y');
     $chartTitle = 'Events Created in ' . $selectedYear;
@@ -208,11 +328,12 @@ if ($day !== '') {
 
     $query = "SELECT MONTH(created_at) AS label, COUNT(*) AS total
               FROM events
-              WHERE YEAR(created_at) = ?
+              WHERE created_by_user_id = ?
+                AND YEAR(created_at) = ?
               GROUP BY MONTH(created_at)
               ORDER BY MONTH(created_at) ASC";
-    $params[] = $selectedYear;
-    $paramTypes = 'i';
+    $params = [$id, $selectedYear];
+    $paramTypes = 'ii';
 }
 
 $eventStmt = $conn->prepare($query);
@@ -297,7 +418,7 @@ if ($leadingBusinessStmt) {
 }
 
 $evaluationEventOptions = [];
-$evaluationEventResult = $conn->query("
+$evaluationEventStmt = $conn->prepare("
     SELECT
         ee.event_code,
         ee.event_id,
@@ -308,10 +429,11 @@ $evaluationEventResult = $conn->query("
         e.start_date_and_time,
         e.end_date_and_time
     FROM event_evaluations ee
-    LEFT JOIN events e
+    INNER JOIN events e
         ON e.id = ee.event_id
     WHERE ee.event_code IS NOT NULL
         AND TRIM(ee.event_code) <> ''
+        AND e.created_by_user_id = ?
     GROUP BY
         ee.event_code,
         ee.event_id,
@@ -321,10 +443,21 @@ $evaluationEventResult = $conn->query("
     ORDER BY last_response_at DESC, ee.event_code ASC
 ");
 
+$evaluationEventResult = null;
+if ($evaluationEventStmt) {
+    $evaluationEventStmt->bind_param("i", $id);
+    $evaluationEventStmt->execute();
+    $evaluationEventResult = $evaluationEventStmt->get_result();
+}
+
 if ($evaluationEventResult) {
     while ($row = $evaluationEventResult->fetch_assoc()) {
         $evaluationEventOptions[] = $row;
     }
+}
+
+if ($evaluationEventStmt) {
+    $evaluationEventStmt->close();
 }
 
 $selectedEvaluationEventCode = isset($_GET['evaluation_event_code']) ? trim((string) $_GET['evaluation_event_code']) : '';
@@ -349,34 +482,37 @@ $evaluationResult = null;
 if ($selectedEvaluationEventCode !== '') {
     $evaluationStmt = $conn->prepare("
         SELECT
-            id,
-            event_id,
-            event_code,
-            full_name,
-            client_type,
-            sex,
-            age_group,
-            cc1,
-            cc2,
-            cc3,
-            overall_rating,
-            content_rating,
-            speaker_rating,
-            responsiveness_rating,
-            reliability_rating,
-            access_facilities_rating,
-            communication_rating,
-            integrity_rating,
-            assurance_rating,
-            outcome_rating,
-            created_at
-        FROM event_evaluations
-        WHERE event_code = ?
-        ORDER BY created_at DESC, id DESC
+            ee.id,
+            ee.event_id,
+            ee.event_code,
+            ee.full_name,
+            ee.client_type,
+            ee.sex,
+            ee.age_group,
+            ee.cc1,
+            ee.cc2,
+            ee.cc3,
+            ee.overall_rating,
+            ee.content_rating,
+            ee.speaker_rating,
+            ee.responsiveness_rating,
+            ee.reliability_rating,
+            ee.access_facilities_rating,
+            ee.communication_rating,
+            ee.integrity_rating,
+            ee.assurance_rating,
+            ee.outcome_rating,
+            ee.created_at
+        FROM event_evaluations ee
+        INNER JOIN events e
+            ON e.id = ee.event_id
+        WHERE ee.event_code = ?
+            AND e.created_by_user_id = ?
+        ORDER BY ee.created_at DESC, ee.id DESC
     ");
 
     if ($evaluationStmt) {
-        $evaluationStmt->bind_param("s", $selectedEvaluationEventCode);
+        $evaluationStmt->bind_param("si", $selectedEvaluationEventCode, $id);
         $evaluationStmt->execute();
         $evaluationResult = $evaluationStmt->get_result();
     }
@@ -777,6 +913,11 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
 .welcome-card::after { content:''; position:absolute; bottom:-30%; left:-10%; width:150px; height:150px; background:rgba(255,255,255,0.05); border-radius:50%; }
 .dashboard-card { background:white; border-radius:10px; padding:2rem; margin-bottom:1.5rem; box-shadow:0 5px 25px rgba(0,0,0,0.08); border:none; transition:all 0.3s ease; position:relative; overflow:hidden; }
 .dashboard-card:hover { transform:translateY(-8px); box-shadow:0 15px 35px rgba(0,0,0,0.15); }
+.password-reminder {background:#fff8eb; border-left:5px solid #f59e0b; border-radius:10px; padding:1rem 1.25rem; margin-bottom:1.5rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; box-shadow:0 5px 18px rgba(0,0,0,0.06);}
+.password-reminder strong {color:#633b00;}
+.password-reminder p {margin:0; color:#7a4b00;}
+.password-reminder a {background:linear-gradient(135deg,var(--primary-color),var(--gradient-end)); color:#fff; border-radius:8px; padding:.7rem 1rem; text-decoration:none; font-weight:600; white-space:nowrap;}
+.password-reminder a:hover {color:#fff; filter:brightness(1.05);}
 .card-icon { width:70px; height:70px; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-bottom:1.5rem; font-size:1.8rem; background:rgba(0,26,71,0.1); color:#001a47; }
 .card-value { font-size:2.2rem; font-weight:700; margin:0.5rem 0; background:linear-gradient(135deg,var(--primary-color),var(--gradient-end)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
 .card-title { font-weight:600; color:var(--primary-color); margin-bottom:1rem; font-size:1.2rem; }
@@ -862,6 +1003,68 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
     position:relative;
 }
 
+.registration-table-wrap{
+    border:1px solid rgba(0,26,71,.08);
+    border-radius:10px;
+    overflow:auto;
+    background:#fff;
+}
+
+.registration-table{
+    min-width:1280px;
+    width:100%;
+    border-collapse:collapse;
+}
+
+.registration-table th,
+.registration-table td{
+    border:1px solid rgba(15,23,42,.08);
+    padding:.62rem .75rem;
+    font-size:.84rem;
+    vertical-align:top;
+}
+
+.registration-table th{
+    background:linear-gradient(135deg,#123c73,#1d5ea8);
+    color:#fff;
+    font-weight:600;
+    white-space:nowrap;
+}
+
+.registration-table tbody tr:nth-child(even){
+    background:#f8fafc;
+}
+
+.registration-search{
+    max-width:320px;
+}
+
+.eval-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    border-radius:999px;
+    padding:.32rem .6rem;
+    font-size:.78rem;
+    font-weight:700;
+    white-space:nowrap;
+}
+
+.eval-badge.done{
+    background:#dcfce7;
+    color:#166534;
+}
+
+.eval-badge.pending{
+    background:#fef3c7;
+    color:#92400e;
+}
+
+.eval-badge.expired{
+    background:#fee2e2;
+    color:#991b1b;
+}
+
 .events-chart-scroll{
     width:100%;
     overflow:hidden;
@@ -875,14 +1078,31 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
     padding:14px 16px 12px;
 }
 
+.municipality-card-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:.75rem;
+    flex-wrap:wrap;
+    margin-bottom:.5rem;
+}
+
+.municipality-card-header h6{
+    margin:0;
+    min-width:0;
+    line-height:1.35;
+}
+
 .municipality-chart-scroll{
     width:100%;
-    overflow:hidden;
+    overflow-x:auto;
+    overflow-y:hidden;
     padding-bottom:2px;
 }
 
 #municipalityChart{
     min-height:180px;
+    min-width:640px;
     width:100% !important;
     display:block;
     background:#fff;
@@ -1458,6 +1678,14 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
     #eventsChart{
         min-width:0;
     }
+
+    .municipality-card{
+        padding:12px;
+    }
+
+    #municipalityChart{
+        min-width:720px;
+    }
 }
 
 @media (max-width:576px){
@@ -1572,6 +1800,16 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
             </div>
         </div>
 
+        <?php if ($mustChangePassword === 1): ?>
+        <div class="password-reminder">
+            <div>
+                <strong><i class="fas fa-shield-alt me-2"></i>Secure your new account</strong>
+                <p>Your account was created with a temporary password. Please change it in Settings.</p>
+            </div>
+            <a href="settings.php#change-password"><i class="fas fa-key me-2"></i>Change Password</a>
+        </div>
+        <?php endif; ?>
+
         <!-- Stats Grid -->
         <div class="stats-grid">
 
@@ -1607,7 +1845,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
             <i class="fas fa-calendar-alt"></i>
         </div>
         <h6 class="card-title">Total Events</h6>
-        <div class="card-value counter" data-target="4">0</div>
+        <div class="card-value counter" data-target="<?php echo $totalEvents; ?>">0</div>
     </div>
 
     <div class="dashboard-card">
@@ -1631,7 +1869,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
 <div class="dashboard-split">
 
     <div class="white-card municipality-card">
-        <div class="d-flex justify-content-between mb-2">
+        <div class="municipality-card-header">
             <h6>Number of invited Attendees by Municipality</h6>
             <div class="dropdown filter-wrap">
                 <button class="btn btn-sm filter-btn filter-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Filter municipality chart">
@@ -1776,6 +2014,87 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
     </div>
 
 </div>
+
+<div class="section-block">
+    <div class="section-heading d-flex flex-wrap justify-content-between align-items-end gap-3">
+        <div>
+            <h4>Event Registrations</h4>
+            <p>
+                People who registered for events created by this Negosyo Center.
+                Evaluated: <?php echo number_format($evaluatedRegistrationCount); ?> |
+                Not yet evaluated: <?php echo number_format($notYetEvaluatedRegistrationCount); ?> |
+                Not evaluated: <?php echo number_format($notEvaluatedRegistrationCount); ?>
+            </p>
+        </div>
+        <input type="text" id="registrationSearch" class="form-control registration-search" placeholder="Search registrations...">
+    </div>
+    <div class="registration-table-wrap">
+        <table class="registration-table" id="registrationTable">
+            <thead>
+                <tr>
+                    <th>Event</th>
+                    <th>Event Code</th>
+                    <th>Registrant</th>
+                    <th>Email</th>
+                    <th>Contact</th>
+                    <th>Age</th>
+                    <th>Sex</th>
+                    <th>Address</th>
+                    <th>Business</th>
+                    <th>Position</th>
+                    <th>Evaluation Status</th>
+                    <th>Registered</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($registrationRows)): ?>
+                    <tr><td colspan="12" class="text-center text-muted">No registrations found for your events yet.</td></tr>
+                <?php endif; ?>
+                <?php foreach ($registrationRows as $registration): ?>
+                    <?php
+                    $hasEvaluation = !empty($registration['evaluation_id']);
+                    $eventEndTs = !empty($registration['end_date_and_time']) ? strtotime($registration['end_date_and_time']) : false;
+                    $evaluationDeadlineTs = $eventEndTs ? $eventEndTs + (24 * 60 * 60) : false;
+                    $isPastEvaluationWindow = !$hasEvaluation && (!$evaluationDeadlineTs || time() > $evaluationDeadlineTs);
+                    $evaluationStatusClass = $hasEvaluation ? 'done' : ($isPastEvaluationWindow ? 'expired' : 'pending');
+                    $evaluationStatusText = $hasEvaluation ? 'Evaluated' : ($isPastEvaluationWindow ? 'Not evaluated' : 'Not yet evaluated');
+                    $registrantName = trim((string) ($registration['first_name'] ?? '') . ' ' . (string) ($registration['last_name'] ?? ''));
+                    $registrantAddress = trim(implode(', ', array_filter([
+                        $registration['barangay'] ?? '',
+                        $registration['city'] ?? '',
+                        $registration['province'] ?? ''
+                    ], fn($value) => trim((string) $value) !== '')));
+                    $businessText = trim((string) ($registration['business_name'] ?? ''));
+                    if ($businessText === '' || strcasecmp($businessText, 'N/A') === 0) {
+                        $businessText = 'N/A';
+                    } elseif (trim((string) ($registration['business_address'] ?? '')) !== '' && strcasecmp((string) $registration['business_address'], 'N/A') !== 0) {
+                        $businessText .= ' - ' . $registration['business_address'];
+                    }
+                    ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($registration['event_title'] ?: 'Untitled Event'); ?></td>
+                        <td><?php echo htmlspecialchars($registration['event_code'] ?: 'N/A'); ?></td>
+                        <td><?php echo htmlspecialchars($registrantName !== '' ? $registrantName : 'N/A'); ?></td>
+                        <td><?php echo htmlspecialchars($registration['email']); ?></td>
+                        <td><?php echo htmlspecialchars($registration['contact_number']); ?></td>
+                        <td><?php echo htmlspecialchars((string) $registration['age']); ?></td>
+                        <td><?php echo htmlspecialchars($registration['sex']); ?></td>
+                        <td><?php echo htmlspecialchars($registrantAddress !== '' ? $registrantAddress : 'N/A'); ?></td>
+                        <td><?php echo htmlspecialchars($businessText); ?></td>
+                        <td><?php echo htmlspecialchars($registration['position']); ?></td>
+                        <td>
+                            <span class="eval-badge <?php echo htmlspecialchars($evaluationStatusClass); ?>">
+                                <?php echo htmlspecialchars($evaluationStatusText); ?>
+                            </span>
+                        </td>
+                        <td><?php echo !empty($registration['created_at']) ? htmlspecialchars(date('M d, Y h:i A', strtotime($registration['created_at']))) : 'N/A'; ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <div class="white-card chart-small">
                 <div class="row align-items-center mb-3">
                 <div class="col-md-6">
@@ -2339,6 +2658,16 @@ if (municipalityFilterTypeInput && municipalityFilterValueInput) {
     });
 }
 
+const registrationSearch = document.getElementById('registrationSearch');
+if (registrationSearch) {
+    registrationSearch.addEventListener('input', function () {
+        const filter = this.value.toLowerCase();
+        document.querySelectorAll('#registrationTable tbody tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none';
+        });
+    });
+}
+
 /* ===== ANIMATION COUNTER ===== */
 const counters = document.querySelectorAll('.counter');
 
@@ -2439,7 +2768,13 @@ const municipalityChart = new Chart(document.getElementById('municipalityChart')
             x:{
                 title:{display:true, text:<?php echo json_encode($municipalityXAxisTitle); ?>, color:'#001a47', font:{weight:600}},
                 grid:{display:false},
-                ticks:{color:'#001a47', autoSkip:false, maxRotation:0, minRotation:0}
+                ticks:{
+                    color:'#001a47',
+                    autoSkip:true,
+                    maxTicksLimit:8,
+                    maxRotation:35,
+                    minRotation:0
+                }
             },
             y:{
                 beginAtZero:true,
