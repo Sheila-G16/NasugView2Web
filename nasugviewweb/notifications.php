@@ -14,6 +14,7 @@ $admin_fullname = "User";
 $designation = "Admin";
 
 nasugviewweb_ensure_notifications_table($conn);
+nasugviewweb_sync_business_owner_notifications($conn);
 
 $userStmt = $conn->prepare("SELECT username, fname, lname, designation FROM negosyo_center_users WHERE id=? LIMIT 1");
 if ($userStmt) {
@@ -28,6 +29,27 @@ if ($userStmt) {
     }
 
     $userStmt->close();
+}
+
+if (isset($_GET['open'])) {
+    $notification_id = (int) $_GET['open'];
+
+    if ($notification_id > 0) {
+        $update = $conn->prepare("
+            UPDATE notifications
+            SET is_read=1
+            WHERE id=? AND user_id=? AND account_type='negosyo_center'
+        ");
+
+        if ($update) {
+            $update->bind_param("ii", $notification_id, $user_id);
+            $update->execute();
+            $update->close();
+        }
+    }
+
+    header("Location: businesses.php");
+    exit();
 }
 
 if (isset($_GET['read'])) {
@@ -143,7 +165,7 @@ body{margin:0;font-family:'Poppins',sans-serif;background:#f0f4ff;min-height:100
                     <?php $currentGroup = $group; ?>
                 <?php endif; ?>
 
-                <a href="businesses.php" class="notif-card <?php echo ((int) $notification['is_read'] === 0) ? 'unread' : ''; ?>">
+                <a href="notifications.php?open=<?php echo (int) $notification['id']; ?>" class="notif-card <?php echo ((int) $notification['is_read'] === 0) ? 'unread' : ''; ?>">
                     <div class="notif-title"><?php echo htmlspecialchars($notification['title']); ?></div>
                     <div class="notif-message"><?php echo htmlspecialchars($notification['message']); ?></div>
                     <div class="notif-footer">

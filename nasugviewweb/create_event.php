@@ -195,8 +195,8 @@ textarea.form-control { height:120px; resize:none; }
                         </select>
                     </div>
                     <div class="col-12" id="googleMeetLinkGroup" style="display:none;">
-                        <label class="form-label">Google Meet Link <span class="text-danger">*</span></label>
-                        <input type="url" name="google_meet_link" id="googleMeetLink" class="form-control" value="<?php echo htmlspecialchars($google_meet_link); ?>" placeholder="https://meet.google.com/xxx-xxxx-xxx">
+                        <label class="form-label">Google Meet / Zoom Link <span class="text-danger">*</span></label>
+                        <input type="url" name="google_meet_link" id="googleMeetLink" class="form-control" value="<?php echo htmlspecialchars($google_meet_link); ?>" placeholder="https://meet.google.com/xxx-xxxx-xxx or https://zoom.us/j/...">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Start Date & Time <span class="text-danger">*</span></label>

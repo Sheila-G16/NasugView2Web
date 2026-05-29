@@ -2668,6 +2668,14 @@ if (registrationSearch) {
     });
 }
 
+if (document.getElementById('registrationTable')) {
+    fetch('send_event_registration_email.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: new URLSearchParams({auto_send: '1'})
+    }).catch(() => {});
+}
+
 /* ===== ANIMATION COUNTER ===== */
 const counters = document.querySelectorAll('.counter');
 

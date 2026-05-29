@@ -114,4 +114,29 @@ if (!function_exists('nasugviewweb_notify_centers_new_business')) {
         }
     }
 }
+
+if (!function_exists('nasugviewweb_sync_business_owner_notifications')) {
+    function nasugviewweb_sync_business_owner_notifications(mysqli $conn): void
+    {
+        nasugviewweb_ensure_notifications_table($conn);
+
+        $businesses = $conn->query("
+            SELECT b_id, business_name, fname, lname, address
+            FROM business_owner
+            ORDER BY b_id ASC
+        ");
+
+        if (!$businesses) {
+            return;
+        }
+
+        while ($business = $businesses->fetch_assoc()) {
+            $businessName = trim((string) ($business['business_name'] ?? ''));
+            $ownerName = trim((string) ($business['fname'] ?? '') . ' ' . (string) ($business['lname'] ?? ''));
+            $address = trim((string) ($business['address'] ?? ''));
+
+            nasugviewweb_notify_centers_new_business($conn, $businessName, $ownerName, $address);
+        }
+    }
+}
 ?>

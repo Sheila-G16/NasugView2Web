@@ -85,9 +85,9 @@ if (isset($_SESSION['user_id'])) {
         if ($stmt) {
             $stmt->bind_param("i", $_SESSION['user_id']);
             $stmt->execute();
-            $result = $stmt->get_result();
+            $sidebar_user_result = $stmt->get_result();
 
-            if ($row = $result->fetch_assoc()) {
+            if ($row = $sidebar_user_result->fetch_assoc()) {
                 $fname = trim($row['fname'] ?? '');
                 $lname = trim($row['lname'] ?? '');
                 $username = trim($row['username'] ?? '');
@@ -109,6 +109,7 @@ $sidebar_initials = nasugviewweb_sidebar_initials($admin_fullname);
 $sidebar_notification_count = 0;
 
 if (isset($_SESSION['user_id']) && isset($sidebar_conn) && $sidebar_conn instanceof mysqli) {
+    nasugviewweb_sync_business_owner_notifications($sidebar_conn);
     $sidebar_notification_count = nasugviewweb_unread_notification_count($sidebar_conn, (int) $_SESSION['user_id']);
 }
 ?>
