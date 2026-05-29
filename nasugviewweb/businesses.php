@@ -15,26 +15,72 @@ if (!isset($_SESSION['user_id'])) {
    FETCH ADMIN NAME
 ============================= */
 $id = $_SESSION['user_id'];
+$admin_fullname = "Admin";
 
-$stmt = $conn->prepare("SELECT username, fname, lname FROM negosyo_center_users WHERE id=?");
+$stmt = $conn->prepare("SELECT username, fname, lname FROM negosyo_center_users WHERE id = ?");
+if (!$stmt) {
+    die("Admin Query Prepare Error: " . $conn->error);
+}
+
 $stmt->bind_param("i", $id);
 $stmt->execute();
 $result_admin = $stmt->get_result();
 
-$admin_fullname = "Admin";
 if ($row_admin = $result_admin->fetch_assoc()) {
-    $admin_fullname = trim($row_admin['fname'].' '.$row_admin['lname']);
+    $admin_fullname = trim($row_admin['fname'] . ' ' . $row_admin['lname']);
+}
+
+$stmt->close();
+
+/* =============================
+   DEBUG DATABASE CONNECTION
+============================= */
+$db_name = "Unknown";
+$db_result = $conn->query("SELECT DATABASE() AS db_name");
+if ($db_result && $db_row = $db_result->fetch_assoc()) {
+    $db_name = $db_row['db_name'];
+}
+
+$table_exists = false;
+$table_check = $conn->query("SHOW TABLES LIKE 'business_owner'");
+if ($table_check && $table_check->num_rows > 0) {
+    $table_exists = true;
+}
+
+$total_businesses = 0;
+if ($table_exists) {
+    $count_result = $conn->query("SELECT COUNT(*) AS total FROM business_owner");
+    if ($count_result && $count_row = $count_result->fetch_assoc()) {
+        $total_businesses = (int)$count_row['total'];
+    }
 }
 
 /* =============================
    FETCH BUSINESSES
 ============================= */
-$sql = "SELECT business_name, fname, lname, address, gender, description, phone 
-        FROM business_owner 
-        ORDER BY business_name ASC";
+$result = false;
 
-$result = $conn->query($sql);
-if (!$result) die("SQL Error: " . $conn->error);
+if ($table_exists) {
+    $sql = "
+        SELECT 
+            b_id,
+            business_name,
+            fname,
+            lname,
+            address,
+            gender,
+            description,
+            phone
+        FROM business_owner
+        ORDER BY business_name ASC
+    ";
+
+    $result = $conn->query($sql);
+
+    if (!$result) {
+        die("Business Query Error: " . $conn->error);
+    }
+}
 
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
@@ -44,6 +90,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>Businesses - NasugView</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -54,7 +101,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
 :root {
     --primary-color:#001a47;
     --secondary-color:#f8f9fa;
-    --gradient-end:#00308a;
     --sidebar-width:250px;
 }
 
@@ -64,24 +110,20 @@ body {
     margin:0;
 }
 
-/* Sidebar should sit on the left, fixed */
 .sidebar {
-    position: fixed;
+    position:fixed;
     top:0;
     left:0;
-    width: var(--sidebar-width);
+    width:var(--sidebar-width);
     height:100%;
-    z-index: 1000;
+    z-index:1000;
 }
 
-/* Main content pushed right of sidebar */
 .main-content {
-    margin-left: var(--sidebar-width);
+    margin-left:var(--sidebar-width);
     padding:2rem;
     min-height:100vh;
-    position: relative;
-    z-index:1;
-    background: var(--secondary-color);
+    background:var(--secondary-color);
 }
 
 .users-table-container{
@@ -98,10 +140,6 @@ body {
     background:#fff;
 }
 
-.table{
-    border-collapse:collapse;
-}
-
 .table th,
 .table td{
     border:1px solid rgba(15,23,42,.08);
@@ -115,7 +153,6 @@ body {
     color:white;
     font-weight:600;
     line-height:1.25;
-    white-space:normal;
 }
 
 .table tbody tr:nth-child(even) td{
@@ -131,10 +168,10 @@ body {
     justify-content:center;
     border:none;
     color:white;
+    text-decoration:none;
 }
 
 .btn-view{background:#17a2b8;}
-.btn-edit{background:#ffc107;}
 
 .search-icon{
     position:absolute;
@@ -151,110 +188,31 @@ body {
     color:var(--primary-color);
 }
 
+.debug-box{
+    background:#fff3cd;
+    border:1px solid #ffecb5;
+    color:#664d03;
+    padding:1rem;
+    border-radius:10px;
+    margin-bottom:1rem;
+    font-size:.9rem;
+}
+
 @media (max-width:992px){
     .main-content{
         margin-left:0;
         padding:5rem 1rem 2rem;
     }
 }
-
-@media (max-width:768px){
-    .main-content > .d-flex{
-        align-items:flex-start !important;
-        gap:1rem;
-    }
-
-    .search-box{
-        width:100% !important;
-    }
-
-    .users-table-container{
-        padding:1.25rem;
-        border-radius:10px;
-    }
-
-    .table-responsive{
-        border:0;
-        border-radius:0;
-        overflow:visible;
-        background:transparent;
-    }
-
-    #businessTable thead{
-        display:none;
-    }
-
-    #businessTable,
-    #businessTable tbody,
-    #businessTable tr,
-    #businessTable td{
-        display:block;
-        width:100%;
-    }
-
-    #businessTable tr{
-        margin-bottom:1rem;
-        border:1px solid #e5e7eb;
-        border-radius:8px;
-        overflow:hidden;
-        background:#fff;
-    }
-
-    #businessTable td{
-        display:flex;
-        justify-content:space-between;
-        gap:1rem;
-        padding:.8rem 1rem;
-        text-align:right;
-        border-bottom:1px solid #f1f3f4;
-        overflow-wrap:anywhere;
-    }
-
-    #businessTable td:last-child{
-        border-bottom:0;
-    }
-
-    #businessTable td::before{
-        content:"";
-        color:#001a47;
-        font-weight:700;
-        text-align:left;
-        flex:0 0 42%;
-    }
-
-    #businessTable td:nth-child(1)::before{ content:"#"; }
-    #businessTable td:nth-child(2)::before{ content:"Business Name"; }
-    #businessTable td:nth-child(3)::before{ content:"Owner Name"; }
-    #businessTable td:nth-child(4)::before{ content:"Address"; }
-    #businessTable td:nth-child(5)::before{ content:"Gender"; }
-    #businessTable td:nth-child(6)::before{ content:"Description"; }
-    #businessTable td:nth-child(7)::before{ content:"Phone"; }
-    #businessTable td:nth-child(8)::before{ content:"Actions"; }
-
-    #businessTable .d-flex{
-        justify-content:flex-end;
-    }
-}
-
-@media (max-width:576px){
-    .main-content{
-        padding-left:.75rem;
-        padding-right:.75rem;
-    }
-
-    .main-content h2{
-        font-size:1.45rem;
-    }
-}
 </style>
 </head>
+
 <body>
 
 <?php include 'sidebar.php'; ?>
 
 <div class="main-content">
 
-    <!-- HEADER -->
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
         <div>
             <h2 class="fw-bold page-title">List of Registered Businesses</h2>
@@ -267,7 +225,16 @@ body {
         </div>
     </div>
 
-    <!-- TABLE -->
+    <?php if (!$table_exists || $total_businesses === 0): ?>
+        <div class="debug-box">
+            <strong>Database Check:</strong><br>
+            Connected Database: <strong><?= htmlspecialchars($db_name); ?></strong><br>
+            business_owner table exists: <strong><?= $table_exists ? 'YES' : 'NO'; ?></strong><br>
+            Total business_owner records: <strong><?= $total_businesses; ?></strong><br><br>
+            If your phpMyAdmin has data but this shows 0, your <strong>db.php</strong> is connected to the wrong database.
+        </div>
+    <?php endif; ?>
+
     <div class="users-table-container">
         <div class="table-responsive">
             <table class="table table-hover" id="businessTable">
@@ -283,33 +250,41 @@ body {
                         <th>Actions</th>
                     </tr>
                 </thead>
+
                 <tbody>
-                <?php
-                if($result->num_rows > 0){
-                    $count = 1;
-                    while($row = $result->fetch_assoc()){
-                        $owner = trim($row['fname'].' '.$row['lname']);
-                        echo "<tr>";
-                        echo "<td>".$count++."</td>";
-                        echo "<td>".htmlspecialchars($row['business_name'])."</td>";
-                        echo "<td>".htmlspecialchars($owner)."</td>";
-                        echo "<td>".htmlspecialchars($row['address'])."</td>";
-                        echo "<td>".htmlspecialchars($row['gender'])."</td>";
-                        echo "<td>".htmlspecialchars($row['description'] ?: '-')."</td>";
-                        echo "<td>".htmlspecialchars($row['phone'] ?: '-')."</td>";
-                        echo "<td>
-                                <div class='d-flex gap-2'>
-                                    <button class='btn-action btn-view'><i class='fas fa-eye'></i></button>
-                                    <button class='btn-action btn-edit'><i class='fas fa-edit'></i></button>
+                <?php if ($result && $result->num_rows > 0): ?>
+                    <?php $count = 1; ?>
+                    <?php while ($row = $result->fetch_assoc()): ?>
+                        <?php
+                            $owner = trim(($row['fname'] ?? '') . ' ' . ($row['lname'] ?? ''));
+                        ?>
+
+                        <tr>
+                            <td><?= $count++; ?></td>
+                            <td><?= htmlspecialchars($row['business_name'] ?: '-'); ?></td>
+                            <td><?= htmlspecialchars($owner ?: '-'); ?></td>
+                            <td><?= htmlspecialchars($row['address'] ?: '-'); ?></td>
+                            <td><?= htmlspecialchars($row['gender'] ?: '-'); ?></td>
+                            <td><?= htmlspecialchars($row['description'] ?: '-'); ?></td>
+                            <td><?= htmlspecialchars($row['phone'] ?: '-'); ?></td>
+                            <td>
+                                <div class="d-flex gap-2">
+                                    <a href="view_business.php?id=<?= (int)$row['b_id']; ?>" class="btn-action btn-view" title="View business">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
                                 </div>
-                              </td>";
-                        echo "</tr>";
-                    }
-                } else {
-                    echo '<tr><td colspan="8" class="text-center text-muted">No businesses found.</td></tr>';
-                }
-                ?>
+                            </td>
+                        </tr>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            No businesses found.
+                        </td>
+                    </tr>
+                <?php endif; ?>
                 </tbody>
+
             </table>
         </div>
     </div>
@@ -318,8 +293,8 @@ body {
 
 <script>
 document.getElementById("searchInput").addEventListener("keyup", function() {
-    let filter = this.value.toLowerCase();
-    let rows = document.querySelectorAll("#businessTable tbody tr");
+    const filter = this.value.toLowerCase();
+    const rows = document.querySelectorAll("#businessTable tbody tr");
 
     rows.forEach(row => {
         row.style.display = row.innerText.toLowerCase().includes(filter) ? "" : "none";

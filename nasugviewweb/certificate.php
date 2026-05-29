@@ -9,17 +9,20 @@ $smtpConfig = is_file($smtpConfigFile) ? require $smtpConfigFile : [];
 $admin_fullname = "User";
 $designation = "Admin";
 
-if (isset($_SESSION['user_id'])) {
-    $id = (int) $_SESSION['user_id'];
-    $stmt = $conn->prepare("SELECT fname, lname, designation FROM negosyo_center_users WHERE id = ?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $result = $stmt->get_result();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit();
+}
 
-    if ($row = $result->fetch_assoc()) {
-        $admin_fullname = trim($row['fname'] . " " . $row['lname']);
-        $designation = $row['designation'];
-    }
+$id = (int) $_SESSION['user_id'];
+$stmt = $conn->prepare("SELECT fname, lname, designation FROM negosyo_center_users WHERE id = ?");
+$stmt->bind_param("i", $id);
+$stmt->execute();
+$result = $stmt->get_result();
+
+if ($row = $result->fetch_assoc()) {
+    $admin_fullname = trim($row['fname'] . " " . $row['lname']);
+    $designation = $row['designation'];
 }
 
 function formatCertificateEventDate($start, $end) {
@@ -214,7 +217,7 @@ $certificateTemplateName = 'certificate-design';
 $selectedEvaluationId = isset($_GET['evaluation_id']) ? (int) $_GET['evaluation_id'] : 0;
 $selectedCertificateEventCode = isset($_GET['event_code']) ? trim((string) $_GET['event_code']) : '';
 $certificateEventOptions = [];
-$certificateEventResult = $conn->query("
+$certificateEventStmt = $conn->prepare("
     SELECT
         ee.event_code,
         COUNT(*) AS total_participants,
@@ -224,10 +227,11 @@ $certificateEventResult = $conn->query("
         e.end_date_and_time,
         e.address
     FROM event_evaluations ee
-    LEFT JOIN events e
+    INNER JOIN events e
         ON e.id = ee.event_id
     WHERE ee.event_code IS NOT NULL
         AND TRIM(ee.event_code) <> ''
+        AND e.created_by_user_id = ?
     GROUP BY
         ee.event_code,
         e.title,
@@ -237,10 +241,21 @@ $certificateEventResult = $conn->query("
     ORDER BY last_evaluated_at DESC, ee.event_code ASC
 ");
 
+$certificateEventResult = null;
+if ($certificateEventStmt) {
+    $certificateEventStmt->bind_param("i", $id);
+    $certificateEventStmt->execute();
+    $certificateEventResult = $certificateEventStmt->get_result();
+}
+
 if ($certificateEventResult) {
     while ($eventRow = $certificateEventResult->fetch_assoc()) {
         $certificateEventOptions[] = $eventRow;
     }
+}
+
+if ($certificateEventStmt) {
+    $certificateEventStmt->close();
 }
 
 $validCertificateEventCodes = array_map(function ($eventRow) {
@@ -266,12 +281,12 @@ $certificateQuery = "
         e.end_date_and_time,
         e.address
     FROM event_evaluations ee
-    LEFT JOIN events e
+    INNER JOIN events e
         ON e.id = ee.event_id
-    WHERE 1 = 1
+    WHERE e.created_by_user_id = ?
 ";
-$certificateParams = [];
-$certificateTypes = '';
+$certificateParams = [$id];
+$certificateTypes = 'i';
 $hasCertificateCriteria = false;
 
 if ($selectedEvaluationId > 0) {
@@ -285,9 +300,6 @@ if ($selectedEvaluationId > 0) {
     $certificateTypes .= 's';
     $hasCertificateCriteria = true;
 } elseif (isset($_SESSION['user_id'])) {
-    $certificateQuery .= " AND ee.user_id = ?";
-    $certificateParams[] = (int) $_SESSION['user_id'];
-    $certificateTypes .= 'i';
     $hasCertificateCriteria = true;
 }
 
@@ -320,17 +332,20 @@ $certificateParticipants = [];
 if ($selectedCertificateEventCode !== '') {
     $participantStmt = $conn->prepare("
         SELECT
-            id,
-            full_name,
-            email,
-            event_code
-        FROM event_evaluations
-        WHERE event_code = ?
-        ORDER BY full_name ASC, created_at DESC, id DESC
+            ee.id,
+            ee.full_name,
+            ee.email,
+            ee.event_code
+        FROM event_evaluations ee
+        INNER JOIN events e
+            ON e.id = ee.event_id
+        WHERE ee.event_code = ?
+            AND e.created_by_user_id = ?
+        ORDER BY ee.full_name ASC, ee.created_at DESC, ee.id DESC
     ");
 
     if ($participantStmt) {
-        $participantStmt->bind_param("s", $selectedCertificateEventCode);
+        $participantStmt->bind_param("si", $selectedCertificateEventCode, $id);
         $participantStmt->execute();
         $participantResult = $participantStmt->get_result();
         while ($participantRow = $participantResult->fetch_assoc()) {
@@ -1247,6 +1262,29 @@ body.left-panel-hidden .main-content{
     padding-bottom:14px;
 }
 
+.inspector-head-row{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:.75rem;
+}
+
+.inspector-close-btn{
+    width:34px;
+    height:34px;
+    border:0;
+    border-radius:8px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:#eef2ff;
+    color:#001a47;
+}
+
+.inspector-close-btn:hover{
+    background:#dbe7ff;
+}
+
 .selection-name{
     margin-top:8px;
     display:inline-flex;
@@ -2048,6 +2086,11 @@ body.exporting #canvas::before{
                         <span class="btn-text">Email</span>
                         <span class="btn-tooltip">Send certificate to selected participant</span>
                     </button>
+                    <button class="action-btn" type="button" id="sendAllCertificateEmailsBtn">
+                        <i class="fas fa-paper-plane" aria-hidden="true"></i>
+                        <span class="btn-text">All Email</span>
+                        <span class="btn-tooltip">Send certificates to all evaluated participants</span>
+                    </button>
                     <button class="action-btn" type="button" id="downloadAllParticipantsBtn">
                         <i class="fas fa-users" aria-hidden="true"></i>
                         <span class="btn-text">All PDF</span>
@@ -2106,8 +2149,15 @@ body.exporting #canvas::before{
 
         <aside class="panel inspector inspector-panel" id="inspectorPanel">
             <div class="panel-head">
-                <span class="eyebrow">Inspector</span>
-                <h3>Selected Element</h3>
+                <div class="inspector-head-row">
+                    <div>
+                        <span class="eyebrow">Inspector</span>
+                        <h3>Selected Element</h3>
+                    </div>
+                    <button type="button" class="inspector-close-btn" id="closeInspectorBtn" aria-label="Close inspector" title="Close inspector">
+                        <i class="fas fa-times" aria-hidden="true"></i>
+                    </button>
+                </div>
                 <div class="selection-name" id="selectionLabel">Nothing selected</div>
             </div>
 
@@ -2300,6 +2350,7 @@ const canvasViewport = document.getElementById('canvasViewport');
 const boardStage = document.querySelector('.board-stage');
 const pageShell = document.getElementById('pageShell');
 const inspectorPanel = document.getElementById('inspectorPanel');
+const closeInspectorBtn = document.getElementById('closeInspectorBtn');
 const hideLeftPanelBtn = document.getElementById('hideLeftPanelBtn');
 const showLeftPanelBtn = document.getElementById('showLeftPanelBtn');
 const templateNameInput = document.getElementById('templateName');
@@ -2307,6 +2358,7 @@ const certificateEventSelect = document.getElementById('certificateEventSelect')
 const certificateParticipantSelect = document.getElementById('certificateParticipantSelect');
 const downloadAllParticipantsBtn = document.getElementById('downloadAllParticipantsBtn');
 const sendCertificateEmailBtn = document.getElementById('sendCertificateEmailBtn');
+const sendAllCertificateEmailsBtn = document.getElementById('sendAllCertificateEmailsBtn');
 const imageInput = document.getElementById('imageInput');
 const backgroundInput = document.getElementById('backgroundInput');
 const selectionLabel = document.getElementById('selectionLabel');
@@ -3761,6 +3813,96 @@ function sendCertificateEmail() {
         });
 }
 
+async function postCertificateEmail(recipientName, recipientEmail, imageDataUrl, templateNameValue) {
+    const params = new URLSearchParams();
+    params.set('send_certificate_email', '1');
+    params.set('recipient_name', recipientName);
+    params.set('recipient_email', recipientEmail);
+    params.set('event_title', getSelectedCertificateEvent()?.title || certificateDefaults.eventTitle || '');
+    params.set('template_name', templateNameValue);
+    params.set('image', imageDataUrl);
+
+    const response = await fetch('', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+    });
+    const text = await response.text();
+
+    try {
+        return JSON.parse(text);
+    } catch (error) {
+        throw new Error('Email server returned an invalid response. Please check PHP mail/SMTP settings.');
+    }
+}
+
+async function sendAllCertificateEmails() {
+    const participants = (certificateDefaults.participants || []).filter((participant) => String(participant.email || '').trim() !== '');
+    if (!participants.length) {
+        alert('No evaluated participants with email addresses were found for this event.');
+        return;
+    }
+
+    if (!confirm(`Send certificates to ${participants.length} evaluated participant(s)?`)) {
+        return;
+    }
+
+    const recipientItem = findCertificateItem('recipient');
+    const bodyItem = findCertificateItem('body');
+    const originalRecipient = recipientItem?.querySelector('.item-content')?.innerHTML || '';
+    const originalBody = bodyItem?.querySelector('.item-content')?.innerHTML || '';
+    const originalTemplateName = templateNameInput.value;
+    const originalSelectedParticipant = certificateParticipantSelect?.value || '';
+    const originalButtonText = sendAllCertificateEmailsBtn.querySelector('.btn-text')?.textContent || 'All Email';
+    let sent = 0;
+    let failed = 0;
+    const failures = [];
+
+    sendAllCertificateEmailsBtn.disabled = true;
+
+    try {
+        for (let index = 0; index < participants.length; index++) {
+            const participant = participants[index];
+            sendAllCertificateEmailsBtn.querySelector('.btn-text').textContent = `${index + 1}/${participants.length}`;
+            applyCertificateParticipant(participant.name, false);
+
+            if (certificateParticipantSelect) {
+                certificateParticipantSelect.value = String(participant.id);
+            }
+
+            const result = await renderCanvasForExport();
+            const templateNameValue = templateNameInput.value.trim();
+            const emailResult = await postCertificateEmail(
+                participant.name,
+                participant.email,
+                result.toDataURL('image/png'),
+                templateNameValue
+            );
+
+            if (emailResult.status === 'sent') {
+                sent++;
+            } else {
+                failed++;
+                failures.push(`${participant.name || participant.email}: ${emailResult.message || 'Email could not be sent.'}`);
+            }
+        }
+
+        const summary = `Certificate emails sent: ${sent}. Failed: ${failed}.`;
+        alert(failures.length ? `${summary}\n\n${failures.slice(0, 5).join('\n')}` : summary);
+    } catch (error) {
+        alert(error.message || 'Certificate emails could not be sent. Please try again.');
+    } finally {
+        setCertificateText('recipient', originalRecipient || '&nbsp;');
+        setCertificateText('body', originalBody || '&nbsp;');
+        templateNameInput.value = originalTemplateName;
+        if (certificateParticipantSelect) {
+            certificateParticipantSelect.value = originalSelectedParticipant;
+        }
+        sendAllCertificateEmailsBtn.disabled = false;
+        sendAllCertificateEmailsBtn.querySelector('.btn-text').textContent = originalButtonText;
+    }
+}
+
 async function downloadAllParticipantsPDF() {
     if (!window.jspdf?.jsPDF) {
         alert('PDF export is still loading. Please try again in a moment.');
@@ -3896,6 +4038,7 @@ certificateParticipantSelect?.addEventListener('change', () => {
     }
 });
 sendCertificateEmailBtn?.addEventListener('click', sendCertificateEmail);
+sendAllCertificateEmailsBtn?.addEventListener('click', sendAllCertificateEmails);
 downloadAllParticipantsBtn?.addEventListener('click', downloadAllParticipantsPDF);
 downloadBtn.addEventListener('click', toggleDownloadMenu);
 downloadMenu.addEventListener('click', (event) => {
@@ -3945,6 +4088,10 @@ document.getElementById('replaceImageBtn').addEventListener('click', () => {
     imageInput.click();
 });
 
+closeInspectorBtn?.addEventListener('click', () => {
+    clearSelection();
+});
+
 canvas.addEventListener('mousedown', (event) => {
     closeContextMenu();
     if (event.target === canvas) {
@@ -3976,6 +4123,17 @@ canvas.addEventListener('contextmenu', (event) => {
 document.addEventListener('mousedown', (event) => {
     if (!event.target.closest('#contextMenu') && !event.target.closest('.design-item')) {
         closeContextMenu();
+    }
+
+    if (
+        selectedItem &&
+        !event.target.closest('#canvas') &&
+        !event.target.closest('#inspectorPanel') &&
+        !event.target.closest('#contextMenu') &&
+        !event.target.closest('.download-menu-wrap') &&
+        !event.target.closest('.swal2-container')
+    ) {
+        clearSelection();
     }
 
     if (!event.target.closest('.download-menu-wrap')) {

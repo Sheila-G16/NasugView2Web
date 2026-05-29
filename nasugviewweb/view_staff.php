@@ -1,7 +1,23 @@
 <?php
 session_start();
 require_once __DIR__ . "/db.php";
-$staff=$conn->query("SELECT * FROM negosyo_center_users WHERE designation='Staff'");
+
+if (!isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit();
+}
+
+$loggedInUserId = (int) $_SESSION['user_id'];
+$centerStmt = $conn->prepare("SELECT negosyocenter FROM negosyo_center_users WHERE id=? LIMIT 1");
+$centerStmt->bind_param("i", $loggedInUserId);
+$centerStmt->execute();
+$currentCenter = trim((string) ($centerStmt->get_result()->fetch_assoc()['negosyocenter'] ?? ''));
+$centerStmt->close();
+
+$staffStmt = $conn->prepare("SELECT * FROM negosyo_center_users WHERE designation='Staff' AND negosyocenter=? ORDER BY id DESC");
+$staffStmt->bind_param("s", $currentCenter);
+$staffStmt->execute();
+$staff = $staffStmt->get_result();
 ?>
 
 <!DOCTYPE html>

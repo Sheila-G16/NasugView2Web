@@ -415,11 +415,6 @@ margin-bottom:1.5rem;
 <h4><?php echo htmlspecialchars($admin['fullname']); ?></h4>
 <p><?php echo htmlspecialchars($admin['designation']); ?></p><p><?php echo $admin['email']; ?></p>
 
-<div class="admin-id">
-<i class="fas fa-id-card me-2"></i>
-Admin ID: <?php echo $admin['admin_id']; ?>
-</div>
-
 </div>
 
 <a href="logout.php" class="btn-save">Logout</a>

@@ -1,47 +1,41 @@
 <?php
 session_start();
-
 require_once __DIR__ . "/db.php";
 
-/* DEFAULT VALUES */
 $admin_fullname = "User";
-$designation = "";
+$designation = "DTI Admin";
+$fname = "User";
 
-/* GET LOGGED IN ADMIN INFO */
 if (isset($_SESSION['user_id'])) {
-    $id = $_SESSION['user_id'];
-
-    $stmt = $conn->prepare("SELECT username, fname, lname, designation FROM dti_user WHERE dti_id=?");
+    $id = (int) $_SESSION['user_id'];
+    $stmt = $conn->prepare("SELECT username, fname, lname, designation FROM dti_user WHERE dti_id=? LIMIT 1");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $result = $stmt->get_result();
 
     if ($row = $result->fetch_assoc()) {
-        $fname = trim($row['fname']);
-        $lname = trim($row['lname']);
-        $username = trim($row['username']);
-
-        $admin_fullname = ($fname || $lname)
-            ? trim($fname . ' ' . $lname)
-            : $username;
-
-        $designation = $row['designation']; // FIXED
+        $fname = trim((string) $row['fname']);
+        $lname = trim((string) $row['lname']);
+        $username = trim((string) $row['username']);
+        $admin_fullname = ($fname !== '' || $lname !== '') ? trim($fname . ' ' . $lname) : $username;
+        $designation = trim((string) $row['designation']) ?: "DTI Admin";
     }
+
+    $stmt->close();
 }
-/* DASHBOARD COUNTS */
-$totalUsers = $conn->query("SELECT COUNT(*) as total FROM dti_user")->fetch_assoc()['total'] ?? 0;
-$totalAdmins = $conn->query("SELECT COUNT(*) as total FROM dti_user WHERE designation='Admin'")->fetch_assoc()['total'] ?? 0;
-$totalStaff = $conn->query("SELECT COUNT(*) as total FROM dti_user WHERE designation='Staff'")->fetch_assoc()['total'] ?? 0;
 
-/* EVENTS FILTERS */
-$year = isset($_GET['year']) ? trim($_GET['year']) : '';
-$month = isset($_GET['month']) ? trim($_GET['month']) : '';
-$day = isset($_GET['day']) ? trim($_GET['day']) : '';
+$totalCenters = (int) ($conn->query("SELECT COUNT(DISTINCT negosyocenter) AS total FROM negosyo_center_users WHERE TRIM(negosyocenter) <> ''")->fetch_assoc()['total'] ?? 0);
+$totalCenterUsers = (int) ($conn->query("SELECT COUNT(*) AS total FROM negosyo_center_users")->fetch_assoc()['total'] ?? 0);
+$totalEvents = (int) ($conn->query("SELECT COUNT(*) AS total FROM events")->fetch_assoc()['total'] ?? 0);
+$implementedEvents = (int) ($conn->query("SELECT COUNT(*) AS total FROM events WHERE status='Implemented' OR remarks='Done' OR end_date_and_time < NOW()")->fetch_assoc()['total'] ?? 0);
 
+$year = isset($_GET['year']) ? trim((string) $_GET['year']) : '';
+$month = isset($_GET['month']) ? trim((string) $_GET['month']) : '';
+$day = isset($_GET['day']) ? trim((string) $_GET['day']) : '';
 $year = preg_match('/^\d{4}$/', $year) ? $year : '';
 $month = preg_match('/^\d{4}-\d{2}$/', $month) ? $month : '';
 $day = preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) ? $day : '';
-
+$selectedCenter = isset($_GET['center']) ? trim((string) $_GET['center']) : '';
 $filterType = 'year';
 $filterValue = $year !== '' ? $year : date('Y');
 
@@ -53,76 +47,156 @@ if ($day !== '') {
     $filterValue = $month;
 }
 
-$chartTitle = 'Events Created (Monthly)';
-$monthLabels = [];
-$counts = [];
-$query = '';
+$dateColumn = "COALESCE(e.created_at, e.start_date_and_time)";
+$whereParts = [];
 $params = [];
 $paramTypes = '';
+$dateWhereParts = [];
+$dateParams = [];
+$dateParamTypes = '';
 
-if ($day !== '') {
-    $chartTitle = 'Events Created on ' . date('F j, Y', strtotime($day));
-    $query = "SELECT DATE(created_at) AS label, COUNT(*) AS total
-              FROM events
-              WHERE DATE(created_at) = ?
-              GROUP BY DATE(created_at)";
-    $params[] = $day;
-    $paramTypes = 's';
-    $monthLabels = [date('M j, Y', strtotime($day))];
-    $counts = [0];
-} elseif ($month !== '') {
-    $chartTitle = 'Events Created in ' . date('F Y', strtotime($month . '-01'));
-    $daysInMonth = (int) date('t', strtotime($month . '-01'));
-    for ($d = 1; $d <= $daysInMonth; $d++) {
-        $monthLabels[] = str_pad((string) $d, 2, '0', STR_PAD_LEFT);
-        $counts[] = 0;
+$centerOptions = [];
+$centerOptionsResult = $conn->query("
+    SELECT DISTINCT negosyocenter
+    FROM negosyo_center_users
+    WHERE TRIM(negosyocenter) <> ''
+    ORDER BY negosyocenter ASC
+");
+if ($centerOptionsResult) {
+    while ($row = $centerOptionsResult->fetch_assoc()) {
+        $centerOptions[] = (string) $row['negosyocenter'];
     }
-
-    $query = "SELECT DAY(created_at) AS label, COUNT(*) AS total
-              FROM events
-              WHERE DATE_FORMAT(created_at, '%Y-%m') = ?
-              GROUP BY DAY(created_at)
-              ORDER BY DAY(created_at) ASC";
-    $params[] = $month;
-    $paramTypes = 's';
-} else {
-    $selectedYear = $year !== '' ? $year : date('Y');
-    $chartTitle = 'Events Created in ' . $selectedYear;
-
-    for ($m = 1; $m <= 12; $m++) {
-        $monthLabels[] = date('M', mktime(0, 0, 0, $m, 1));
-        $counts[] = 0;
-    }
-
-    $query = "SELECT MONTH(created_at) AS label, COUNT(*) AS total
-              FROM events
-              WHERE YEAR(created_at) = ?
-              GROUP BY MONTH(created_at)
-              ORDER BY MONTH(created_at) ASC";
-    $params[] = $selectedYear;
-    $paramTypes = 'i';
 }
 
-$stmt = $conn->prepare($query);
+if ($selectedCenter !== '' && !in_array($selectedCenter, $centerOptions, true)) {
+    $selectedCenter = '';
+}
+
+if ($day !== '') {
+    $dateWhereParts[] = "DATE($dateColumn) = ?";
+    $dateParams[] = $day;
+    $dateParamTypes .= 's';
+} elseif ($month !== '') {
+    $dateWhereParts[] = "DATE_FORMAT($dateColumn, '%Y-%m') = ?";
+    $dateParams[] = $month;
+    $dateParamTypes .= 's';
+} else {
+    $dateWhereParts[] = "YEAR($dateColumn) = ?";
+    $dateParams[] = (int) $filterValue;
+    $dateParamTypes .= 'i';
+}
+
+$whereParts = $dateWhereParts;
+$params = $dateParams;
+$paramTypes = $dateParamTypes;
+
+if ($selectedCenter !== '') {
+    $whereParts[] = "u.negosyocenter = ?";
+    $params[] = $selectedCenter;
+    $paramTypes .= 's';
+}
+
+$whereSql = implode(' AND ', $whereParts);
+$dateWhereSql = implode(' AND ', $dateWhereParts);
+
+if ($day !== '') {
+    $chartTitle = 'Events on ' . date('F j, Y', strtotime($day));
+    $chartLabels = [date('M j, Y', strtotime($day))];
+    $chartCounts = [0];
+    $labelExpression = "DATE($dateColumn)";
+} elseif ($month !== '') {
+    $chartTitle = 'Events in ' . date('F Y', strtotime($month . '-01'));
+    $chartLabels = [];
+    $chartCounts = [];
+    for ($d = 1; $d <= (int) date('t', strtotime($month . '-01')); $d++) {
+        $chartLabels[] = str_pad((string) $d, 2, '0', STR_PAD_LEFT);
+        $chartCounts[] = 0;
+    }
+    $labelExpression = "DAY($dateColumn)";
+} else {
+    $chartTitle = 'Events in ' . $filterValue;
+    $chartLabels = [];
+    $chartCounts = [];
+    for ($m = 1; $m <= 12; $m++) {
+        $chartLabels[] = date('M', mktime(0, 0, 0, $m, 1));
+        $chartCounts[] = 0;
+    }
+    $labelExpression = "MONTH($dateColumn)";
+}
+
+$chartQuery = "
+    SELECT $labelExpression AS label, COUNT(e.id) AS total
+    FROM events e
+    LEFT JOIN negosyo_center_users u ON u.id = e.created_by_user_id
+    WHERE $whereSql
+    GROUP BY $labelExpression
+    ORDER BY $labelExpression ASC
+";
+$stmt = $conn->prepare($chartQuery);
 if ($stmt) {
     $stmt->bind_param($paramTypes, ...$params);
     $stmt->execute();
     $result = $stmt->get_result();
-
     while ($row = $result->fetch_assoc()) {
-        $index = (int) $row['label'] - 1;
-
-        if ($day !== '') {
-            $counts[0] = (int) $row['total'];
-            continue;
-        }
-
-        if (isset($counts[$index])) {
-            $counts[$index] = (int) $row['total'];
+        $index = $day !== '' ? 0 : ((int) $row['label'] - 1);
+        if (isset($chartCounts[$index])) {
+            $chartCounts[$index] = (int) $row['total'];
         }
     }
-
     $stmt->close();
+}
+
+$centerEventRows = [];
+$centerEventLabels = [];
+$centerEventCounts = [];
+$centerRankingQuery = "
+    SELECT
+        COALESCE(NULLIF(TRIM(u.negosyocenter), ''), 'Unassigned / Legacy Events') AS center_name,
+        COUNT(e.id) AS total_events,
+        SUM(CASE
+            WHEN e.status='Implemented' OR e.remarks='Done' OR e.end_date_and_time < NOW()
+            THEN 1 ELSE 0
+        END) AS implemented_events,
+        MAX(COALESCE(e.created_at, e.start_date_and_time)) AS latest_event_at
+    FROM events e
+    LEFT JOIN negosyo_center_users u ON u.id = e.created_by_user_id
+    WHERE $whereSql
+    GROUP BY center_name
+    ORDER BY total_events DESC, center_name ASC
+";
+$centerRankingStmt = $conn->prepare($centerRankingQuery);
+if ($centerRankingStmt) {
+    if ($paramTypes !== '') {
+        $centerRankingStmt->bind_param($paramTypes, ...$params);
+    }
+    $centerRankingStmt->execute();
+    $centerRankingResult = $centerRankingStmt->get_result();
+    while ($row = $centerRankingResult->fetch_assoc()) {
+        $centerEventRows[] = $row;
+    }
+    $centerRankingStmt->close();
+}
+
+foreach (array_slice($centerEventRows, 0, 8) as $row) {
+    $centerEventLabels[] = $row['center_name'];
+    $centerEventCounts[] = (int) $row['total_events'];
+}
+
+$topCenterName = $centerEventRows[0]['center_name'] ?? 'No data';
+$topCenterEvents = (int) ($centerEventRows[0]['total_events'] ?? 0);
+
+$centerAccounts = [];
+$centerQuery = "
+    SELECT negosyocenter, fname, lname, email, designation, contact
+    FROM negosyo_center_users
+    ORDER BY negosyocenter ASC, lname ASC, fname ASC
+    LIMIT 10
+";
+$centerResult = $conn->query($centerQuery);
+if ($centerResult) {
+    while ($row = $centerResult->fetch_assoc()) {
+        $centerAccounts[] = $row;
+    }
 }
 ?>
 
@@ -131,354 +205,264 @@ if ($stmt) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Dashboard - NasugView</title>
-
+<title>DTI Admin Dashboard - NasugView</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
 <style>
-:root {
-    --primary-color: #001a47; 
-    --secondary-color: #f8f9fa; 
-    --gradient-start: #001a47; 
-    --gradient-end: #00308a;
-}
-body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; overflow-x:hidden; background:linear-gradient(135deg,var(--gradient-start)0%,var(--gradient-end)100%); }
-.main-content { margin-left:250px; background:var(--secondary-color); min-height:100vh; padding:3rem 2rem; }
-.content-wrapper { max-width:1400px; margin:0 auto; }
-.welcome-card { background:linear-gradient(135deg,var(--primary-color),var(--gradient-end)); color:white; border-radius:10px; padding:2.5rem; margin-bottom:2rem; box-shadow:0 10px 30px rgba(0,26,71,0.3); position:relative; overflow:hidden; }
-.welcome-card::before { content:''; position:absolute; top:-50%; right:-20%; width:200px; height:200px; background:rgba(255,255,255,0.1); border-radius:50%; }
-.welcome-card::after { content:''; position:absolute; bottom:-30%; left:-10%; width:150px; height:150px; background:rgba(255,255,255,0.05); border-radius:50%; }
-.dashboard-card { background:white; border-radius:10px; padding:2rem; margin-bottom:1.5rem; box-shadow:0 5px 25px rgba(0,0,0,0.08); border:none; transition:all 0.3s ease; position:relative; overflow:hidden; }
-.dashboard-card:hover { transform:translateY(-8px); box-shadow:0 15px 35px rgba(0,0,0,0.15); }
-.card-icon { width:70px; height:70px; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-bottom:1.5rem; font-size:1.8rem; background:rgba(0,26,71,0.1); color:#001a47; }
-.card-value { font-size:2.2rem; font-weight:700; margin:0.5rem 0; background:linear-gradient(135deg,var(--primary-color),var(--gradient-end)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-.card-title { font-weight:600; color:var(--primary-color); margin-bottom:1rem; font-size:1.2rem; }
-.quick-action-btn { background:linear-gradient(135deg,var(--primary-color),var(--gradient-end)); border:none; border-radius:8px; padding:1rem 1.5rem; font-weight:600; color:white; transition:all 0.3s ease; width:100%; margin-bottom:0.5rem; font-size:0.95rem; position:relative; overflow:hidden; }
-.quick-action-btn:hover { transform:translateY(-3px); box-shadow:0 8px 25px rgba(0,26,71,0.3); }
-.filter-input { border:1px solid rgba(0,26,71,0.2); color:var(--primary-color); background:#fff; }
-.filter-input:focus { border-color:var(--primary-color); box-shadow:0 0 0 0.2rem rgba(0,26,71,0.15); }
-.filter-btn { background:linear-gradient(135deg,var(--primary-color),var(--gradient-end)); border:none; color:#fff; }
-.filter-btn:hover,
-.filter-btn:focus,
-.filter-btn:active,
-.filter-btn.show { background:linear-gradient(135deg,var(--primary-color),var(--gradient-end)) !important; border-color:transparent !important; color:#fff !important; box-shadow:0 0 0 0.2rem rgba(0,26,71,0.15) !important; }
-.filter-reset { border:1px solid rgba(0,26,71,0.2); color:var(--primary-color); background:#fff; }
-.filter-reset:hover,
-.filter-reset:focus,
-.filter-reset:active { border-color:var(--primary-color) !important; color:var(--primary-color) !important; background:#fff !important; box-shadow:0 0 0 0.2rem rgba(0,26,71,0.15) !important; }
-.filter-wrap { display:flex; justify-content:flex-end; }
-.filter-toggle { width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:8px; }
-.filter-menu { min-width:220px; padding:1rem; border:none; border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,0.12); background:#fff; }
-.filter-form { display:flex; flex-direction:column; gap:0.75rem; }
-.filter-options { display:flex; gap:0.5rem; }
-.filter-option { flex:1; border:1px solid rgba(0,26,71,0.2); background:#fff; color:var(--primary-color); border-radius:10px; padding:0.45rem 0.5rem; font-size:0.85rem; font-weight:500; }
-.filter-option.active { background:linear-gradient(135deg,var(--primary-color),var(--gradient-end)); border-color:transparent; color:#fff; }
-.filter-value { width:100%; }
-.filter-actions { display:flex; gap:0.5rem; }
-.filter-actions .btn { flex:1; }
-.stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:1.5rem; margin-bottom:2rem; }
-.floating-shapes { position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none; overflow:hidden; z-index:0; }
-.shape { position:absolute; border-radius:50%; background: rgba(189, 187, 219, 0.14); animation: float 6s ease-in-out infinite; }
-.shape-1 { width: 80px; height: 80px; top: 10%; right: 10%; animation-delay: 0s; }
-.shape-2 { width: 60px; height: 60px; bottom: 5%; right: 80%; animation-delay: 1s; }
-@keyframes float { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-20px) rotate(180deg); } }
-
-.chart-wrapper { overflow:hidden; padding-bottom: 10px; }
-#eventsChart { height: 250px; width:100% !important; display:block; }
-
-@media (max-width:992px){
-    .main-content{
-        margin-left:0;
-        padding:5rem 1rem 2rem;
-    }
-
-    .content-wrapper{
-        max-width:100%;
-    }
-
-    .welcome-card,
-    .dashboard-card{
-        border-radius:10px;
-        padding:1.25rem;
-    }
-
-    .welcome-card .text-end{
-        text-align:left !important;
-        margin-top:1rem;
-    }
-
-    .dashboard-card:hover,
-    .quick-action-btn:hover{
-        transform:none;
-    }
-}
-
-@media (max-width:576px){
-    .main-content{
-        padding-left:.75rem;
-        padding-right:.75rem;
-    }
-
-    .stats-grid{
-        grid-template-columns:1fr;
-        gap:1rem;
-    }
-
-    .welcome-card h3{
-        font-size:1.35rem;
-    }
-
-    .card-icon{
-        width:56px;
-        height:56px;
-        margin-bottom:1rem;
-        font-size:1.45rem;
-    }
-
-    .card-value{
-        font-size:1.85rem;
-    }
-
-    .row.align-items-center.mb-3 > [class*="col-"]{
-        width:100%;
-        text-align:left !important;
-    }
-
-    .filter-wrap{
-        justify-content:flex-start;
-        margin-top:.75rem;
-    }
-}
+:root{--primary-color:#001a47;--gradient-end:#00308a;--secondary-color:#f8f9fa;}
+body{margin:0;font-family:Poppins,sans-serif;background:linear-gradient(135deg,var(--primary-color),var(--gradient-end));min-height:100vh;}
+.main-content{margin-left:250px;background:var(--secondary-color);min-height:100vh;padding:2rem;}
+.content-wrapper{max-width:1400px;margin:0 auto;}
+.welcome-card,.dashboard-card{background:#fff;border-radius:10px;box-shadow:0 5px 25px rgba(0,0,0,.08);}
+.welcome-card{background:linear-gradient(135deg,var(--primary-color),var(--gradient-end));color:#fff;border-radius:10px;padding:2.5rem;margin-bottom:2rem;box-shadow:0 10px 30px rgba(0,26,71,.3);position:relative;overflow:hidden;}
+.welcome-card::before{content:'';position:absolute;top:-50%;right:-20%;width:200px;height:200px;background:rgba(255,255,255,.1);border-radius:50%;}
+.welcome-card::after{content:'';position:absolute;bottom:-30%;left:-10%;width:150px;height:150px;background:rgba(255,255,255,.05);border-radius:50%;}
+.floating-shapes{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;overflow:hidden;z-index:0;}
+.shape{position:absolute;border-radius:50%;background:rgba(189,187,219,.14);animation:float 6s ease-in-out infinite;}
+.shape-1{width:80px;height:80px;top:10%;right:10%;animation-delay:0s;}
+.shape-2{width:60px;height:60px;bottom:5%;right:80%;animation-delay:1s;}
+@keyframes float{0%,100%{transform:translateY(0) rotate(0deg);}50%{transform:translateY(-20px) rotate(180deg);}}
+.dashboard-card{padding:1.5rem;margin-bottom:1.5rem;}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1.5rem;}
+.stat-card{background:#fff;border-radius:10px;padding:1.35rem;box-shadow:0 5px 22px rgba(0,0,0,.08);border-left:5px solid var(--primary-color);}
+.stat-icon{width:48px;height:48px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(0,26,71,.1);color:var(--primary-color);font-size:1.25rem;margin-bottom:.9rem;}
+.stat-label{font-size:.88rem;color:#64748b;font-weight:600;margin:0;}
+.stat-value{font-size:2rem;font-weight:700;color:var(--primary-color);margin:0;}
+.card-title{font-weight:700;color:var(--primary-color);margin:0;}
+.btn-primary-nv{background:linear-gradient(135deg,var(--primary-color),var(--gradient-end));border:0;color:#fff;border-radius:8px;font-weight:600;}
+.btn-primary-nv:hover{color:#fff;filter:brightness(1.05);}
+.form-control,.form-select{border-radius:8px;border:1px solid rgba(0,26,71,.2);}
+.table th{background:linear-gradient(135deg,var(--primary-color),var(--gradient-end));color:#fff;border:0;}
+.table td{vertical-align:middle;}
+.notice{border-left:5px solid #f59e0b;background:#fff8eb;color:#633b00;border-radius:8px;padding:1rem;margin-bottom:1.5rem;}
+.chart-shell{height:320px;}
+@media(max-width:992px){.main-content{margin-left:0;padding:5rem 1rem 2rem;}}
+@media(max-width:768px){.dashboard-card,.welcome-card{padding:1rem}.chart-shell{height:280px}.filter-row{gap:.75rem}.filter-row>*{width:100%;}}
 </style>
 </head>
 <body>
-
 <?php include 'sidebar.php'; ?>
 
 <div class="main-content">
-    <div class="content-wrapper">
-
-        <!-- Welcome Card -->
-        <div class="welcome-card">
-            <div class="row align-items-center position-relative" style="z-index:1;">
-                <div class="col-md-8">
-                    <h3 class="fw-bold mb-2">Welcome, <?php echo $fname; ?>! 👋</h3>
-                    <p class="mb-0 opacity-90">Monitor and manage your system efficiently</p>
-                </div>
-                <div class="col-md-4 text-end">
-                    <div class="bg-white bg-opacity-10 rounded-pill px-3 py-2 d-inline-block">
-                        <small><i class="fas fa-clock me-1"></i><?php echo date('l, F j, Y'); ?></small>
-                    </div>
-                </div>
+<div class="content-wrapper">
+    <div class="welcome-card">
+        <div class="row align-items-center position-relative" style="z-index:1;">
+            <div class="col-md-8">
+                <h3 class="fw-bold mb-2">Welcome, <?php echo htmlspecialchars($fname ?: $admin_fullname); ?>!</h3>
+                <p class="mb-0 opacity-90">Monitor and manage your system efficiently</p>
             </div>
-            <div class="floating-shapes">
-                <div class="shape shape-1"></div>
-                <div class="shape shape-2"></div>
+            <div class="col-md-4 text-end">
+                <div class="bg-white bg-opacity-10 rounded-pill px-3 py-2 d-inline-block">
+                    <small><i class="fas fa-clock me-1"></i><?php echo date('l, F j, Y'); ?></small>
+                </div>
             </div>
         </div>
-
-        <!-- Stats Grid -->
-        <div class="stats-grid">
-            <div class="dashboard-card users-card">
-                <div class="card-icon"><i class="fas fa-users"></i></div>
-                <h6 class="card-title">Total Users</h6>
-                <div class="card-value"><?php echo number_format($totalUsers); ?></div>
-                <a href="manage_users.php" class="quick-action-btn mt-3 d-block text-center">
-                    <i class="fas fa-user-cog"></i> Manage Users
-                </a>                     
-            </div>
-            <div class="dashboard-card admins-card">
-                <div class="card-icon"><i class="fas fa-user-shield"></i></div>
-                <h6 class="card-title">Total Admins</h6>
-                <div class="card-value"><?php echo number_format($totalAdmins); ?></div>
-                <a href="add_admin.php" class="quick-action-btn mt-3 d-block text-center">
-                    <i class="fas fa-user-plus"></i> Add Admin
-                </a>
-            </div>
-            <div class="dashboard-card staff-card">
-                <div class="card-icon"><i class="fas fa-user-tie"></i></div>
-                <h6 class="card-title">Total Staff</h6>
-                <div class="card-value"><?php echo number_format($totalStaff); ?></div>
-                <a href="view_staff.php" class="quick-action-btn mt-3 d-block text-center">
-                    <i class="fas fa-search"></i> View Staff
-                </a>
-            </div>
+        <div class="floating-shapes">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
         </div>
+    </div>
 
-        <!-- Events Chart Card -->
-        <div class="dashboard-card chart-wrapper">
-            <div class="row align-items-center mb-3">
-                <div class="col-md-6">
-                    <h6 class="card-title"><?php echo htmlspecialchars($chartTitle); ?></h6>
-                </div>
-                <div class="col-md-6 text-end">
-                    <div class="dropdown filter-wrap">
-                        <button id="filterToggle" class="btn btn-sm filter-btn filter-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Filter chart">
-                            <i class="fas fa-calendar-alt"></i>
-                        </button>
-                        <div class="dropdown-menu dropdown-menu-end filter-menu">
-                            <form id="filterForm" class="filter-form">
-                                <div class="filter-options">
-                                    <button type="button" class="filter-option <?php echo $filterType === 'year' ? 'active' : ''; ?>" data-type="year">Year</button>
-                                    <button type="button" class="filter-option <?php echo $filterType === 'month' ? 'active' : ''; ?>" data-type="month">Month</button>
-                                    <button type="button" class="filter-option <?php echo $filterType === 'day' ? 'active' : ''; ?>" data-type="day">Day</button>
-                                </div>
-                                <input
-                                    id="filterValue"
-                                    class="form-control form-control-sm filter-input filter-value"
-                                    value="<?php echo htmlspecialchars($filterValue); ?>"
-                                    data-year="<?php echo htmlspecialchars($year !== '' ? $year : date('Y')); ?>"
-                                    data-month="<?php echo htmlspecialchars($month); ?>"
-                                    data-day="<?php echo htmlspecialchars($day); ?>"
-                                >
-                                <input type="hidden" id="filterType" value="<?php echo htmlspecialchars($filterType); ?>">
-                                <div class="filter-actions">
-                                    <button type="submit" class="btn btn-sm filter-btn">Apply</button>
-                                    <a href="dashboard.php" class="btn btn-sm filter-reset">Reset</a>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-store"></i></div>
+            <p class="stat-label">Negosyo Centers</p>
+            <p class="stat-value"><?php echo number_format($totalCenters); ?></p>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-user-tie"></i></div>
+            <p class="stat-label">Center Accounts</p>
+            <p class="stat-value"><?php echo number_format($totalCenterUsers); ?></p>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
+            <p class="stat-label">Total Events</p>
+            <p class="stat-value"><?php echo number_format($totalEvents); ?></p>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-flag-checkered"></i></div>
+            <p class="stat-label">Implemented Events</p>
+            <p class="stat-value"><?php echo number_format($implementedEvents); ?></p>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-ranking-star"></i></div>
+            <p class="stat-label">Top Event Creator</p>
+            <p class="stat-value"><?php echo number_format($topCenterEvents); ?></p>
+            <small class="text-muted"><?php echo htmlspecialchars($topCenterName); ?></small>
+        </div>
+    </div>
+
+    <div class="dashboard-card">
+        <form class="row align-items-end filter-row" method="GET">
+            <div class="col-md-3">
+                <label class="form-label">Year</label>
+                <input type="number" name="year" class="form-control" min="2000" max="2100" value="<?php echo htmlspecialchars($year !== '' ? $year : date('Y')); ?>">
             </div>
+            <div class="col-md-3">
+                <label class="form-label">Month</label>
+                <input type="month" name="month" class="form-control" value="<?php echo htmlspecialchars($month); ?>">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Day</label>
+                <input type="date" name="day" class="form-control" value="<?php echo htmlspecialchars($day); ?>">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Negosyo Center</label>
+                <select name="center" class="form-select">
+                    <option value="">All centers</option>
+                    <?php foreach ($centerOptions as $centerName): ?>
+                        <option value="<?php echo htmlspecialchars($centerName); ?>" <?php echo $selectedCenter === $centerName ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($centerName); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-12 d-flex gap-2 mt-3">
+                <button class="btn btn-primary-nv px-4" type="submit"><i class="fas fa-filter me-1"></i> Apply</button>
+                <a class="btn btn-outline-secondary px-4" href="dashboard.php">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="dashboard-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="card-title"><?php echo htmlspecialchars($chartTitle); ?></h6>
+            <span class="text-muted small"><?php echo $selectedCenter !== '' ? htmlspecialchars($selectedCenter) : 'All centers'; ?></span>
+        </div>
+        <div class="chart-shell">
             <canvas id="eventsChart"></canvas>
         </div>
-
     </div>
+
+    <div class="row">
+        <div class="col-lg-5">
+            <div class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="card-title">Events by Negosyo Center</h6>
+                    <span class="text-muted small">Highest first</span>
+                </div>
+                <div class="chart-shell">
+                    <canvas id="centerEventsChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-7">
+            <div class="dashboard-card">
+                <h6 class="card-title mb-3">Negosyo Center Event Counts</h6>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Negosyo Center</th>
+                                <th>Total Events</th>
+                                <th>Implemented</th>
+                                <th>Latest Event</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php if (!$centerEventRows): ?>
+                            <tr><td colspan="5" class="text-muted">No events found for this filter.</td></tr>
+                        <?php endif; ?>
+                        <?php foreach ($centerEventRows as $index => $row): ?>
+                            <tr>
+                                <td><?php echo $index + 1; ?></td>
+                                <td><?php echo htmlspecialchars($row['center_name']); ?></td>
+                                <td><strong><?php echo number_format((int) $row['total_events']); ?></strong></td>
+                                <td><?php echo number_format((int) $row['implemented_events']); ?></td>
+                                <td>
+                                    <?php echo !empty($row['latest_event_at']) ? htmlspecialchars(date('M d, Y', strtotime($row['latest_event_at']))) : 'N/A'; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="dashboard-card">
+                <h6 class="card-title mb-3">Issued Negosyo Center Accounts</h6>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead><tr><th>Center</th><th>Account Holder</th><th>Email</th><th>Designation</th><th>Contact</th></tr></thead>
+                        <tbody>
+                        <?php if (!$centerAccounts): ?>
+                        <tr><td colspan="5" class="text-muted">No issued accounts yet.</td></tr>
+                        <?php endif; ?>
+                        <?php foreach ($centerAccounts as $row): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($row['negosyocenter']); ?></td>
+                            <td><?php echo htmlspecialchars(trim($row['fname'] . ' ' . $row['lname'])); ?></td>
+                            <td><?php echo htmlspecialchars($row['email']); ?></td>
+                            <td><?php echo htmlspecialchars($row['designation']); ?></td>
+                            <td><?php echo htmlspecialchars($row['contact']); ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
 const ctx = document.getElementById('eventsChart').getContext('2d');
-
-const eventsChart = new Chart(ctx, {
+new Chart(ctx, {
     type: 'bar',
     data: {
-        labels: <?php echo json_encode($monthLabels); ?>,
+        labels: <?php echo json_encode($chartLabels); ?>,
         datasets: [{
-            label: 'Events Created',
-            data: <?php echo json_encode($counts); ?>,
+            label: 'Events',
+            data: <?php echo json_encode($chartCounts); ?>,
             backgroundColor: '#001a47',
-            borderColor: '#001a47',
-            borderWidth: 1,
-            maxBarThickness: 40
+            borderRadius: 6,
+            maxBarThickness: 44
         }]
     },
     options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-            legend: { display: false },
-            tooltip: { backgroundColor: '#001a47', titleColor: '#fff', bodyColor: '#fff' }
-        },
+        plugins: { legend: { display: false } },
         scales: {
-            x: { grid: { display: false }, ticks: { color: '#001a47', font: { weight: 500 }, maxRotation: 0 } },
-            y: { beginAtZero: true, ticks: { color: '#001a47', stepSize: 1 }, grid: { color: 'rgba(0,26,71,0.1)' } }
+            x: { grid: { display: false }, ticks: { color: '#001a47', maxRotation: 0 } },
+            y: { beginAtZero: true, ticks: { precision: 0, color: '#001a47' }, grid: { color: 'rgba(0,26,71,.1)' } }
         }
+    }
+});
+
+const centerCtx = document.getElementById('centerEventsChart').getContext('2d');
+new Chart(centerCtx, {
+    type: 'bar',
+    data: {
+        labels: <?php echo json_encode($centerEventLabels); ?>,
+        datasets: [{
+            label: 'Events',
+            data: <?php echo json_encode($centerEventCounts); ?>,
+            backgroundColor: '#00308a',
+            borderRadius: 6,
+            maxBarThickness: 32
+        }]
     },
-    plugins: [{
-        id: 'bar3d',
-        afterDatasetDraw(chart) {
-            const {ctx} = chart;
-            ctx.save();
-            chart.getDatasetMeta(0).data.forEach(bar => {
-                const barWidth = bar.width;
-                const barHeight = bar.height;
-                const xPos = bar.x - barWidth/2;
-                const yPos = bar.y;
-                const depth = 10;
-
-                // Top face
-                ctx.fillStyle = '#00308a';
-                ctx.beginPath();
-                ctx.moveTo(xPos, yPos);
-                ctx.lineTo(xPos + depth, yPos - depth);
-                ctx.lineTo(xPos + barWidth + depth, yPos - depth);
-                ctx.lineTo(xPos + barWidth, yPos);
-                ctx.closePath();
-                ctx.fill();
-
-                // Side face
-                ctx.fillStyle = '#001a47';
-                ctx.beginPath();
-                ctx.moveTo(xPos + barWidth, yPos);
-                ctx.lineTo(xPos + barWidth + depth, yPos - depth);
-                ctx.lineTo(xPos + barWidth + depth, yPos - depth + barHeight);
-                ctx.lineTo(xPos + barWidth, yPos + barHeight);
-                ctx.closePath();
-                ctx.fill();
-            });
-            ctx.restore();
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { beginAtZero: true, ticks: { precision: 0, color: '#001a47' }, grid: { color: 'rgba(0,26,71,.1)' } },
+            y: { grid: { display: false }, ticks: { color: '#001a47' } }
         }
-    }]
-});
-
-const filterType = document.getElementById('filterType');
-const filterValue = document.getElementById('filterValue');
-const filterOptions = document.querySelectorAll('.filter-option');
-
-function syncFilterInput() {
-    const selectedType = filterType.value;
-    filterValue.name = selectedType;
-
-    filterOptions.forEach(option => {
-        option.classList.toggle('active', option.dataset.type === selectedType);
-    });
-
-    if (selectedType === 'year') {
-        filterValue.type = 'number';
-        filterValue.min = '2000';
-        filterValue.max = '2100';
-        filterValue.placeholder = 'Year';
-        filterValue.value = filterValue.dataset.year || new Date().getFullYear();
-    } else if (selectedType === 'month') {
-        filterValue.type = 'month';
-        filterValue.removeAttribute('min');
-        filterValue.removeAttribute('max');
-        filterValue.placeholder = '';
-        filterValue.value = filterValue.dataset.month || '';
-    } else {
-        filterValue.type = 'date';
-        filterValue.removeAttribute('min');
-        filterValue.removeAttribute('max');
-        filterValue.placeholder = '';
-        filterValue.value = filterValue.dataset.day || '';
     }
-}
-
-filterOptions.forEach(option => {
-    option.addEventListener('click', function () {
-        filterType.value = this.dataset.type;
-        syncFilterInput();
-    });
-});
-
-syncFilterInput();
-
-document.getElementById('filterForm').addEventListener('submit', function(e){
-    e.preventDefault();
-
-    filterValue.dataset.year = filterType.value === 'year' ? filterValue.value : filterValue.dataset.year;
-    filterValue.dataset.month = filterType.value === 'month' ? filterValue.value : filterValue.dataset.month;
-    filterValue.dataset.day = filterType.value === 'day' ? filterValue.value : filterValue.dataset.day;
-
-    const params = new URLSearchParams();
-    if (filterValue.value) {
-        params.set(filterType.value, filterValue.value);
-    }
-
-    window.location.href = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
 });
 </script>
-
-</body>
-</html>ript>
-
 </body>
 </html>

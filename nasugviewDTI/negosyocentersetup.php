@@ -27,16 +27,32 @@ if(isset($_SESSION['user_id'])) {
 }
 
 // ==============================
-// Fetch Negosyo Centers
+// Fetch Negosyo Centers from issued accounts
 // ==============================
-$sql = "SELECT * FROM negosyo_centers ORDER BY branch_name ASC";
+$sql = "
+    SELECT
+        u.*,
+        COALESCE(ec.total_events, 0) AS total_events
+    FROM negosyo_center_users u
+    LEFT JOIN (
+        SELECT
+            creator.negosyocenter,
+            COUNT(e.id) AS total_events
+        FROM events e
+        INNER JOIN negosyo_center_users creator
+            ON creator.id = e.created_by_user_id
+        GROUP BY creator.negosyocenter
+    ) ec
+        ON ec.negosyocenter = u.negosyocenter
+    ORDER BY ec.total_events DESC, u.negosyocenter ASC, u.lname ASC, u.fname ASC
+";
 $centers = $conn->query($sql);
 
 // ==============================
 // Statistics
 // ==============================
-$totalCenters = $conn->query("SELECT COUNT(*) as total FROM negosyo_centers")->fetch_assoc()['total'] ?? 0;
-$batangasCenters = $conn->query("SELECT COUNT(*) as total FROM negosyo_centers WHERE province='Batangas'")->fetch_assoc()['total'] ?? 0;
+$totalCenters = $conn->query("SELECT COUNT(DISTINCT negosyocenter) as total FROM negosyo_center_users WHERE TRIM(negosyocenter) <> ''")->fetch_assoc()['total'] ?? 0;
+$totalAccounts = $conn->query("SELECT COUNT(*) as total FROM negosyo_center_users")->fetch_assoc()['total'] ?? 0;
 ?>
 
 <!DOCTYPE html>
@@ -217,14 +233,13 @@ body{
         flex:0 0 42%;
     }
 
-    #centerTable td:nth-child(1)::before{ content:"Branch Name"; }
-    #centerTable td:nth-child(2)::before{ content:"Municipality"; }
-    #centerTable td:nth-child(3)::before{ content:"Province"; }
-    #centerTable td:nth-child(4)::before{ content:"Address"; }
-    #centerTable td:nth-child(5)::before{ content:"Contact"; }
-    #centerTable td:nth-child(6)::before{ content:"Email"; }
-    #centerTable td:nth-child(7)::before{ content:"Officer"; }
-    #centerTable td:nth-child(8)::before{ content:"Actions"; }
+    #centerTable td:nth-child(1)::before{ content:"Negosyo Center"; }
+    #centerTable td:nth-child(2)::before{ content:"Account Holder"; }
+    #centerTable td:nth-child(3)::before{ content:"Email"; }
+    #centerTable td:nth-child(4)::before{ content:"Contact"; }
+    #centerTable td:nth-child(5)::before{ content:"Designation"; }
+    #centerTable td:nth-child(6)::before{ content:"Events Created"; }
+    #centerTable td:nth-child(7)::before{ content:"Actions"; }
 
     .action-buttons{
         justify-content:flex-end;
@@ -263,8 +278,8 @@ body{
 
 <div class="col-md-4">
 <div class="card text-center">
-<h4>Batangas Centers</h4>
-<h2><?php echo $batangasCenters; ?></h2>
+<h4>Issued Accounts</h4>
+<h2><?php echo $totalAccounts; ?></h2>
 </div>
 </div>
 
@@ -275,57 +290,34 @@ body{
 
 <div class="d-flex justify-content-between mb-3">
 <input type="text" id="searchInput" class="form-control" placeholder="Search branch...">
-<a href="create_center.php" class="btn btn-submit ms-2">
-<i class="fas fa-plus"></i> Add Negosyo Center
-</a>
 </div>
 
 <table class="table table-hover" id="centerTable">
 <thead>
 <tr>
-<th>Branch Name</th>
-<th>Municipality</th>
-<th>Province</th>
-<th>Address</th>
-<th>Contact</th>
+<th>Negosyo Center</th>
+<th>Account Holder</th>
 <th>Email</th>
-<th>Officer In Charge</th>
+<th>Contact</th>
+<th>Designation</th>
+<th>Events Created</th>
 <th>Actions</th>
 </tr>
 </thead>
 <tbody>
 <?php while($center = $centers->fetch_assoc()): ?>
 <tr>
-<td><?php echo htmlspecialchars($center['branch_name']); ?></td>
-<td><?php echo htmlspecialchars($center['municipality']); ?></td>
-<td><?php echo htmlspecialchars($center['province']); ?></td>
-<td><?php echo htmlspecialchars($center['address']); ?></td>
-<td><?php echo htmlspecialchars($center['contact_number']); ?></td>
+<td><?php echo htmlspecialchars($center['negosyocenter']); ?></td>
+<td><?php echo htmlspecialchars(trim($center['fname'] . ' ' . $center['lname'])); ?></td>
 <td><?php echo htmlspecialchars($center['email']); ?></td>
-<td><?php echo htmlspecialchars($center['officer_in_charge']); ?></td>
+<td><?php echo htmlspecialchars($center['contact']); ?></td>
+<td><?php echo htmlspecialchars($center['designation']); ?></td>
+<td><strong><?php echo number_format((int) $center['total_events']); ?></strong></td>
 <td>
 <div class="action-buttons">
-<button class="btn-action viewBtn"
-data-branch="<?php echo htmlspecialchars($center['branch_name']); ?>"
-data-municipality="<?php echo htmlspecialchars($center['municipality']); ?>"
-data-province="<?php echo htmlspecialchars($center['province']); ?>"
-data-address="<?php echo htmlspecialchars($center['address']); ?>"
-data-contact="<?php echo htmlspecialchars($center['contact_number']); ?>"
-data-email="<?php echo htmlspecialchars($center['email']); ?>"
-data-officer="<?php echo htmlspecialchars($center['officer_in_charge']); ?>"
-title="View Details">
-<i class="fas fa-eye"></i>
-</button>
-
-<div class="dropdown">
-<button class="btn-action" data-bs-toggle="dropdown">
-<i class="fas fa-ellipsis-h"></i>
-</button>
-<ul class="dropdown-menu dropdown-menu-end">
-<li><a class="dropdown-item" href="edit_center.php?id=<?php echo $center['id']; ?>">Edit</a></li>
-<li><a class="dropdown-item text-danger deleteCenter" href="#" data-center-id="<?php echo $center['id']; ?>">Delete</a></li>
-</ul>
-</div>
+<a class="btn-action text-decoration-none" href="user_management.php" title="Manage account">
+<i class="fas fa-user-cog"></i>
+</a>
 </div>
 </td>
 </tr>
@@ -350,36 +342,6 @@ document.getElementById('searchInput').addEventListener('keyup',function(){
     let rows=document.querySelectorAll('#centerTable tbody tr');
     rows.forEach(row=>{
         row.style.display=row.textContent.toLowerCase().includes(filter)?'':'none';
-    });
-});
-
-document.querySelectorAll('.deleteCenter').forEach(btn=>{
-    btn.addEventListener('click',function(e){
-        e.preventDefault();
-        let id=this.dataset.centerId;
-        Swal.fire({
-            title:'Delete Center?',
-            text:'This action is permanent',
-            icon:'warning',
-            showCancelButton:true,
-            confirmButtonText:'Delete'
-        }).then(result=>{
-            if(result.isConfirmed){
-                fetch('delete_center.php',{
-                    method:'POST',
-                    headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({id:id})
-                })
-                .then(res=>res.json())
-                .then(data=>{
-                    if(data.success){
-                        Swal.fire('Deleted!','Center removed','success').then(()=>location.reload());
-                    }else{
-                        Swal.fire('Error',data.error,'error');
-                    }
-                });
-            }
-        });
     });
 });
 

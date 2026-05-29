@@ -3,11 +3,17 @@ session_start();
 
 require_once __DIR__ . "/db.php";
 
+if (!isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit();
+}
+
+$user_id = (int) $_SESSION['user_id'];
+
 // ==============================
 // Fetch admin info
 // ==============================
 if(isset($_SESSION['user_id'])) {
-    $user_id = $_SESSION['user_id'];
     $stmt = $conn->prepare("SELECT fname, lname, designation FROM negosyo_center_users WHERE id=? LIMIT 1");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
@@ -27,25 +33,43 @@ if(isset($_SESSION['user_id'])) {
 // ==============================
 // Fetch events with status calculation
 // ==============================
-$sql = "SELECT *, 
+$sql = "SELECT e.*,
         CASE 
-            WHEN status = 'Canceled' THEN 'Canceled'
-            WHEN NOW() < start_date_and_time THEN 'For Implementation'
-            WHEN NOW() BETWEEN start_date_and_time AND end_date_and_time THEN 'Ongoing'
-            WHEN NOW() > end_date_and_time THEN 'Implemented'
-            ELSE status
+            WHEN e.status = 'Canceled' THEN 'Canceled'
+            WHEN NOW() < e.start_date_and_time THEN 'For Implementation'
+            WHEN NOW() BETWEEN e.start_date_and_time AND e.end_date_and_time THEN 'Ongoing'
+            WHEN NOW() > e.end_date_and_time THEN 'Implemented'
+            ELSE e.status
         END AS calculated_status
-        FROM events
-        ORDER BY start_date_and_time DESC";
+        FROM events e
+        WHERE e.created_by_user_id = ?
+        ORDER BY e.start_date_and_time DESC";
 
-$events = $conn->query($sql);
+$eventsStmt = $conn->prepare($sql);
+$eventsStmt->bind_param("i", $user_id);
+$eventsStmt->execute();
+$events = $eventsStmt->get_result();
 
 // ==============================
 // Get Events Count Dynamically
 // ==============================
-$totalEvents = $conn->query("SELECT COUNT(*) as total FROM events")->fetch_assoc()['total'] ?? 0;
-$upcomingEvents = $conn->query("SELECT COUNT(*) as total FROM events WHERE start_date_and_time > NOW()")->fetch_assoc()['total'] ?? 0;
-$pastEvents = $conn->query("SELECT COUNT(*) as total FROM events WHERE end_date_and_time < NOW()")->fetch_assoc()['total'] ?? 0;
+$countStmt = $conn->prepare("SELECT COUNT(*) as total FROM events WHERE created_by_user_id = ?");
+$countStmt->bind_param("i", $user_id);
+$countStmt->execute();
+$totalEvents = $countStmt->get_result()->fetch_assoc()['total'] ?? 0;
+$countStmt->close();
+
+$countStmt = $conn->prepare("SELECT COUNT(*) as total FROM events WHERE created_by_user_id = ? AND start_date_and_time > NOW()");
+$countStmt->bind_param("i", $user_id);
+$countStmt->execute();
+$upcomingEvents = $countStmt->get_result()->fetch_assoc()['total'] ?? 0;
+$countStmt->close();
+
+$countStmt = $conn->prepare("SELECT COUNT(*) as total FROM events WHERE created_by_user_id = ? AND end_date_and_time < NOW()");
+$countStmt->bind_param("i", $user_id);
+$countStmt->execute();
+$pastEvents = $countStmt->get_result()->fetch_assoc()['total'] ?? 0;
+$countStmt->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -93,7 +117,7 @@ textarea.form-control { height:120px; resize:none; }
 
 .row.g-3 > div { margin-bottom:16px; }
 
-.table-responsive { border:1px solid rgba(0,26,71,.08); border-radius:10px; overflow:hidden; background:#fff; }
+.table-responsive { border:1px solid rgba(0,26,71,.08); border-radius:10px; overflow:visible; background:#fff; }
 .table { border-collapse:collapse; }
 .table th,
 .table td { border:1px solid rgba(15,23,42,.08); padding:.62rem .75rem; font-size:0.88rem; vertical-align:top; }
@@ -103,6 +127,12 @@ textarea.form-control { height:120px; resize:none; }
 .action-buttons { display:flex; gap:0.5rem; align-items:center; }
 .btn-action { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; border:none; transition: all 0.3s ease; background: linear-gradient(135deg,#001a47,#00308a); color:white; }
 .btn-action:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.2); }
+.event-code-btn {border:0;background:#eef4ff;color:#001a47;border-radius:8px;padding:.45rem .7rem;font-weight:800;letter-spacing:.04em;box-shadow:inset 0 0 0 1px rgba(0,26,71,.14);}
+.event-code-btn:hover {background:#dbeafe;color:#001a47;}
+.code-display-body {background:#001a47;color:#fff;text-align:center;padding:3rem 1.5rem;}
+.code-display-label {font-size:1rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#cfe0ff;margin-bottom:1rem;}
+.code-display-value {font-size:clamp(3rem, 12vw, 8rem);font-weight:800;line-height:1;letter-spacing:.06em;word-break:break-word;}
+.code-display-hint {margin-top:1.4rem;color:#dbeafe;font-size:1rem;}
 
 .dropdown-menu { min-width:150px; }
 
@@ -287,37 +317,30 @@ textarea.form-control { height:120px; resize:none; }
                     <td><?php echo htmlspecialchars($event['title']); ?></td>
                     <td><?php echo date("M d, Y h:i A", $start) . " - " . date("M d, Y h:i A", $end); ?></td>
                     <td><?php echo $duration; ?></td>
-                    <td><?php echo htmlspecialchars($event_code); ?></td>
+                    <td>
+                        <button
+                            type="button"
+                            class="event-code-btn eventCodeBtn"
+                            data-code="<?php echo htmlspecialchars($event_code); ?>"
+                            data-title="<?php echo htmlspecialchars($event['title']); ?>"
+                            title="Show event code"
+                        >
+                            <?php echo htmlspecialchars($event_code); ?>
+                        </button>
+                    </td>
                     <td><?php echo htmlspecialchars($event['mode_of_delivery'] ?: 'N/A'); ?></td>
                     <td><?php echo htmlspecialchars($status); ?></td>
                     <td><?php echo $remarks; ?></td>
                     <td>
                         <div class="action-buttons">
                             <!-- View Button -->
-                            <button class="btn-action viewBtn" 
-                                data-title="<?php echo htmlspecialchars($event['title']); ?>" 
-                                data-start="<?php echo date("M d, Y h:i A", $start); ?>" 
-                                data-end="<?php echo date("M d, Y h:i A", $end); ?>" 
-                                data-duration="<?php echo $duration; ?>" 
-                                data-status="<?php echo $status; ?>" 
-                                data-remarks="<?php echo $remarks; ?>"
-                                data-address="<?php echo htmlspecialchars($event['address']); ?>"
-                                data-mode="<?php echo htmlspecialchars($event['mode_of_delivery'] ?: 'N/A'); ?>"
-                                data-google-meet-link="<?php echo htmlspecialchars($event['google_meet_link'] ?: 'N/A'); ?>"
-                                data-speaker="<?php echo htmlspecialchars($event['speaker'] ?: 'N/A'); ?>"
-                                data-audience="<?php echo htmlspecialchars($event['audience'] ?: 'N/A'); ?>"
-                                data-budget="<?php echo htmlspecialchars($event['budget'] ?: 'N/A'); ?>"
-                                data-funding="<?php echo htmlspecialchars($event['funding_source'] ?: 'N/A'); ?>"
-
-                                data-description="<?php echo htmlspecialchars($event['description']); ?>"
-                                data-event-id="<?php echo $event['id']; ?>"
-                                title="View Details">
+                            <a class="btn-action" href="view_event.php?id=<?php echo (int) $event['id']; ?>" title="View Details">
                                 <i class="fas fa-eye"></i>
-                            </button>
+                            </a>
 
                             <!-- Dropdown Actions -->
                             <div class="dropdown">
-                                <button class="btn-action" data-bs-toggle="dropdown" title="More Actions"><i class="fas fa-ellipsis-h"></i></button>
+                                <button type="button" class="btn-action" data-bs-toggle="dropdown" title="More Actions"><i class="fas fa-ellipsis-h"></i></button>
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     <li><a class="dropdown-item downloadPDF" href="#" data-event-id="<?php echo $event['id']; ?>">Download PDF</a></li>
                                     <li><a class="dropdown-item viewPDF" href="#" data-event-id="<?php echo $event['id']; ?>">View as PDF</a></li>
@@ -347,32 +370,18 @@ textarea.form-control { height:120px; resize:none; }
     </div>
 </div>
 
-<!-- View Details Modal -->
-<div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
+<!-- Event Code Display Modal -->
+<div class="modal fade" id="eventCodeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
     <div class="modal-content">
       <div class="modal-header" style="background:#001a47; color:white;">
-        <h5 class="modal-title">Event Details</h5>
+        <h5 class="modal-title" id="eventCodeModalTitle">Event Code</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body">
-        <p><strong>Title:</strong> <span id="modalTitle"></span></p>
-        <p><strong>Start:</strong> <span id="modalStart"></span></p>
-        <p><strong>End:</strong> <span id="modalEnd"></span></p>
-        <p><strong>Duration:</strong> <span id="modalDuration"></span></p>
-        <p><strong>Status:</strong> <span id="modalStatus"></span></p>
-        <p><strong>Remarks:</strong> <span id="modalRemarks"></span></p>
-        <p><strong>Address / Venue:</strong> <span id="modalAddress"></span></p>
-        <p><strong>Mode of Delivery:</strong> <span id="modalMode"></span></p>
-        <p><strong>Google Meet Link:</strong> <span id="modalGoogleMeetLink"></span></p>
-        <p><strong>Resource Speaker:</strong> <span id="modalSpeaker"></span></p>
-        <p><strong>Target Audience:</strong> <span id="modalAudience"></span></p>
-        <p><strong>Budget:</strong> <span id="modalBudget"></span></p>
-        <p><strong>Funding Source:</strong> <span id="modalFunding"></span></p>
-        <p><strong>Description / Remarks:</strong> <span id="modalDescription"></span></p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      <div class="modal-body code-display-body">
+        <div class="code-display-label">Event Code</div>
+        <div class="code-display-value" id="largeEventCode"></div>
+        <div class="code-display-hint">Show this code to participants during the seminar.</div>
       </div>
     </div>
   </div>
@@ -394,29 +403,13 @@ searchInput.addEventListener('input', function() {
     });
 });
 
-// =====================
-// View Details Modal
-// =====================
-const viewButtons = document.querySelectorAll('.viewBtn');
-const viewModal = new bootstrap.Modal(document.getElementById('viewModal'));
+const eventCodeModal = new bootstrap.Modal(document.getElementById('eventCodeModal'));
 
-viewButtons.forEach(btn => {
+document.querySelectorAll('.eventCodeBtn').forEach(btn => {
     btn.addEventListener('click', () => {
-        document.getElementById('modalTitle').textContent   = btn.dataset.title;
-        document.getElementById('modalStart').textContent   = btn.dataset.start;
-        document.getElementById('modalEnd').textContent     = btn.dataset.end;
-        document.getElementById('modalDuration').textContent= btn.dataset.duration;
-        document.getElementById('modalStatus').textContent  = btn.dataset.status;
-        document.getElementById('modalRemarks').textContent = btn.dataset.remarks;
-        document.getElementById('modalAddress').textContent = btn.dataset.address;
-        document.getElementById('modalMode').textContent    = btn.dataset.mode;
-        document.getElementById('modalGoogleMeetLink').textContent = btn.dataset.googleMeetLink;
-        document.getElementById('modalSpeaker').textContent = btn.dataset.speaker;
-        document.getElementById('modalAudience').textContent= btn.dataset.audience;
-        document.getElementById('modalBudget').textContent  = btn.dataset.budget;
-        document.getElementById('modalFunding').textContent = btn.dataset.funding;
-        document.getElementById('modalDescription').textContent = btn.dataset.description;
-        viewModal.show();
+        document.getElementById('largeEventCode').textContent = btn.dataset.code;
+        document.getElementById('eventCodeModalTitle').textContent = btn.dataset.title || 'Event Code';
+        eventCodeModal.show();
     });
 });
 
