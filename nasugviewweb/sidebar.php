@@ -110,6 +110,7 @@ $sidebar_notification_count = 0;
 
 if (isset($_SESSION['user_id']) && isset($sidebar_conn) && $sidebar_conn instanceof mysqli) {
     nasugviewweb_sync_business_owner_notifications($sidebar_conn);
+    nasugviewweb_sync_evaluation_notifications($sidebar_conn, (int) $_SESSION['user_id']);
     $sidebar_notification_count = nasugviewweb_unread_notification_count($sidebar_conn, (int) $_SESSION['user_id']);
 }
 ?>

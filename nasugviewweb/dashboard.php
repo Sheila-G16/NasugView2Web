@@ -3,6 +3,7 @@ session_start();
 
 require_once __DIR__ . "/db.php";
 require_once __DIR__ . "/account_security.php";
+require_once __DIR__ . "/negosyo_notifications_helper.php";
 
 nasugviewweb_ensure_password_security_columns($conn);
 
@@ -12,6 +13,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $id = (int) $_SESSION['user_id'];
+nasugviewweb_sync_evaluation_notifications($conn, $id);
 $fname = $lname = $username = $admin_fullname = '';
 $negosyoCenter = '';
 $mustChangePassword = (int) ($_SESSION['must_change_password'] ?? 0);
@@ -461,6 +463,7 @@ if ($evaluationEventStmt) {
 }
 
 $selectedEvaluationEventCode = isset($_GET['evaluation_event_code']) ? trim((string) $_GET['evaluation_event_code']) : '';
+$highlightEvaluationId = isset($_GET['highlight_evaluation']) ? (int) $_GET['highlight_evaluation'] : 0;
 $validEvaluationEventCodes = array_map(function ($event) {
     return (string) $event['event_code'];
 }, $evaluationEventOptions);
@@ -1434,6 +1437,18 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
     white-space:nowrap;
 }
 
+.sheet-table tr.highlight-row{
+    background:#fff3cd !important;
+    outline:3px solid #f59e0b;
+    outline-offset:-3px;
+    animation:highlightPulse 1.4s ease-in-out 3;
+}
+
+@keyframes highlightPulse{
+    0%,100%{box-shadow:inset 0 0 0 rgba(245,158,11,0);}
+    50%{box-shadow:inset 0 0 0 999px rgba(245,158,11,.16);}
+}
+
 .report-layout{
     display:grid;
     grid-template-columns:1fr;
@@ -2138,7 +2153,7 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
             </div>
         </div>
 
-        <div class="section-block">
+        <div class="section-block" id="evaluation-responses">
             <div class="section-heading">
                 <h4>Customer Satisfaction Dashboard</h4>
                 <p>Live customer satisfaction tabulation, report, and graph views.</p>
@@ -2248,8 +2263,9 @@ body { margin:0; padding:0; font-family:Poppins,sans-serif; min-height:100vh; ov
                         </thead>
                         <tbody>
                             <?php if (!empty($tabulationRows)): ?>
-                            <?php foreach ($tabulationRows as $row): ?>
-                                <tr>
+                            <?php foreach ($tabulationRows as $rowIndex => $row): ?>
+                                <?php $rowEvaluationId = (int) ($evaluationRows[$rowIndex]['id'] ?? 0); ?>
+                                <tr id="evaluation-row-<?php echo $rowEvaluationId; ?>" class="<?php echo $highlightEvaluationId > 0 && $highlightEvaluationId === $rowEvaluationId ? 'highlight-row' : ''; ?>">
                                     <?php foreach ($row as $cell): ?>
                                         <td><?php echo htmlspecialchars((string) $cell); ?></td>
                                     <?php endforeach; ?>
@@ -2666,6 +2682,13 @@ if (registrationSearch) {
             row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none';
         });
     });
+}
+
+const highlightedEvaluation = document.querySelector('.highlight-row');
+if (highlightedEvaluation) {
+    setTimeout(() => {
+        highlightedEvaluation.scrollIntoView({behavior: 'smooth', block: 'center', inline: 'center'});
+    }, 250);
 }
 
 if (document.getElementById('registrationTable')) {

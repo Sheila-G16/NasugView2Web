@@ -15,6 +15,7 @@ $designation = "Admin";
 
 nasugviewweb_ensure_notifications_table($conn);
 nasugviewweb_sync_business_owner_notifications($conn);
+nasugviewweb_sync_evaluation_notifications($conn, $user_id);
 
 $userStmt = $conn->prepare("SELECT username, fname, lname, designation FROM negosyo_center_users WHERE id=? LIMIT 1");
 if ($userStmt) {
@@ -33,8 +34,27 @@ if ($userStmt) {
 
 if (isset($_GET['open'])) {
     $notification_id = (int) $_GET['open'];
+    $target_url = 'businesses.php';
 
     if ($notification_id > 0) {
+        $targetStmt = $conn->prepare("
+            SELECT target_url
+            FROM notifications
+            WHERE id=? AND user_id=? AND account_type='negosyo_center'
+            LIMIT 1
+        ");
+
+        if ($targetStmt) {
+            $targetStmt->bind_param("ii", $notification_id, $user_id);
+            $targetStmt->execute();
+            $targetRow = $targetStmt->get_result()->fetch_assoc();
+            $targetStmt->close();
+
+            if (!empty($targetRow['target_url'])) {
+                $target_url = (string) $targetRow['target_url'];
+            }
+        }
+
         $update = $conn->prepare("
             UPDATE notifications
             SET is_read=1
@@ -48,7 +68,7 @@ if (isset($_GET['open'])) {
         }
     }
 
-    header("Location: businesses.php");
+    header("Location: " . $target_url);
     exit();
 }
 
@@ -72,7 +92,7 @@ if (isset($_GET['read'])) {
 $notifCount = nasugviewweb_unread_notification_count($conn, $user_id);
 $notifications = [];
 $stmt = $conn->prepare("
-    SELECT id, title, message, is_read, created_at
+    SELECT id, title, message, is_read, created_at, target_type, target_id, target_url
     FROM notifications
     WHERE user_id=? AND account_type='negosyo_center'
     ORDER BY created_at DESC, id DESC
